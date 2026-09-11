@@ -26,6 +26,13 @@ export class Tab1Page implements OnInit {
   constructor() {}
 
   async ngOnInit(): Promise<void> {
+    this.loadBleDevices();
+  }
+
+  public async loadBleDevices() {
+    this.bleDevices.set([]);
+    this.bleDevicesLoading = true;
+
     this.bleDevices.set(
       await this.bleService.getDevicesBleScan({ scanDurationMs: 3000 }),
     );
