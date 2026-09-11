@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'angular.ionic',
-  appName: 'angular-ionic',
-  webDir: 'www'
+  appId: 'led.steuerung',
+  appName: 'LED Steuerung',
+  webDir: 'www',
 };
 
 export default config;

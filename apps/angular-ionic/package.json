@@ -11,7 +11,9 @@
     "test": "ng test",
     "lint": "ng lint",
     "ionic:build": "npm run build",
-    "ionic:serve": "npm run start -- --open"
+    "ionic:serve": "npm run start -- --open",
+    "build:ios": "npm run build && npx cap sync ios",
+    "build:android": "npm run build && npx cap sync android"
   },
   "private": true,
   "dependencies": {
@@ -21,7 +23,9 @@
     "@angular/forms": "22.0.1",
     "@angular/platform-browser": "22.0.1",
     "@angular/router": "22.0.1",
+    "@capacitor-community/bluetooth-le": "^8.3.0",
     "@capacitor/android": "8.5.1",
+    "@capacitor/angular": "^2.0.3",
     "@capacitor/app": "8.1.1",
     "@capacitor/core": "8.5.1",
     "@capacitor/haptics": "8.0.2",

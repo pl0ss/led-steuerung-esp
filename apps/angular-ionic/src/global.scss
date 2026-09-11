@@ -34,4 +34,115 @@
 
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
-@import '@ionic/angular/css/palettes/dark.system.css';
+@import "@ionic/angular/css/palettes/dark.system.css";
+
+:root {
+  /* Theme Unabhängig */
+  --border-radius-ion-item: 12px;
+
+  --button-margin-right: 4px;
+
+  --input-border-with: 2px;
+  --input-border-color: grey;
+
+  --color-dark-pink: #9b0050;
+}
+
+:root {
+  /* Theme: LightMode */
+  --color-accent: #7cc9ff;
+  --color-accent-contrast: black;
+
+  --color-text-darker: #1a1a1a;
+
+  --ion-item-background: #f3f3f3;
+  /* im Lightmode: ist standartmäßig nicht definiert; im Darkmode standartmäßig: #1e1e1e */
+  /* Var nicht umbennen, da dieser Name intern von ionic verwendet wird */
+
+  --color-danger: #ff4747;
+  --color-danger-contrast: black;
+
+  --color-success: #60c752;
+  --color-success-contrast: black;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Theme: DarkMode */
+    --color-accent: #005a9b;
+    --color-accent-contrast: white;
+
+    --color-text-darker: #e3e3e3;
+
+    --ion-background-color: #121212 !important;
+    /* ohne !important wird es unter iOS und in der DevToolsMobileView überschrieben */
+
+    --ion-item-background: #1e1e1e !important;
+    /* im Lightmode: ist standartmäßig nicht definiert; im Darkmode standartmäßig: #1e1e1e */
+    /* Var nicht umbennen, da dieser Name intern von ionic verwendet wird */
+
+    --color-danger: #ad1919;
+    --color-danger-contrast: white;
+
+    --color-success: #39872e;
+    --color-success-contrast: white;
+  }
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif !important;
+  --ion-font-family: Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: bold;
+}
+
+ion-button {
+  --background: var(--color-accent);
+  --color: var(--color-accent-contrast);
+  --border-radius: 8px;
+  font-weight: bold;
+  text-transform: none;
+}
+
+ion-button.danger {
+  --background: var(--color-danger);
+  --color: var(--color-danger-contrast);
+}
+
+ion-button.success {
+  --background: var(--color-success);
+  --color: var(--color-success-contrast);
+}
+
+ion-item.input {
+  --background: var(--ion-item-background);
+  --border-radius: var(--border-radius-ion-item);
+  margin-bottom: 8px;
+  --inner-border-width: 0; // entfernt Linie
+}
+
+.border-radius {
+  border-radius: var(--border-radius-ion-item);
+}
+
+div.marginTop {
+  margin-top: var(--border-radius-ion-item);
+}
+
+div.buttonGroupHorizontal > ion-button {
+  margin-right: var(--button-margin-right);
+}
+
+div.divList > div {
+  margin-top: var(--border-radius-ion-item);
+  border-radius: var(--border-radius-ion-item);
+  background-color: var(--ion-item-background);
+  padding: var(--border-radius-ion-item);
+}
