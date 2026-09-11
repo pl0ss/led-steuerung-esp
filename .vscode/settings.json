@@ -1,0 +1,13 @@
+{
+  "idf.currentSetup": "/Users/kevinploss/.espressif/v6.1/esp-idf",
+  "idf.customExtraVars": {},
+  "clangd.path": "/Users/kevinploss/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/Users/kevinploss/Datein/code/github/led-steuerung-esp/build"
+  ],
+  "idf.flashType": "UART",
+  "idf.port": "/dev/tty.usbserial-110",
+  "cmake.sourceDirectory": "/Users/kevinploss/Datein/code/github/led-steuerung-esp/firmware/bleprph"
+}
