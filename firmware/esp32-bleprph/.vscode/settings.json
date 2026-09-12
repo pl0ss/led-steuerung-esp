@@ -27,11 +27,12 @@
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32"
   },
-  "clangd.path": "/Users/kevinploss/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
+  "clangd.path": "${env:HOME}/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=/Users/kevinploss/Datein/code/github/led-steuerung-esp/firmware/esp32-bleprph/build"
+    "--compile-commands-dir=${env:HOME}/Datein/code/github/led-steuerung-esp/firmware/esp32-bleprph/build"
   ],
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "C_Cpp.errorSquiggles": "enabled"
 }
