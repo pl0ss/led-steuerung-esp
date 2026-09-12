@@ -13,40 +13,51 @@
 
   <section style="margin: 10px">
     @if ((bleService.connectedToADevice$ | async) === false) {
-    <h1 style="margin-top: 0px; margin-bottom: 10px" (click)="loadBleDevices()">
-      Gefundene Geräte
-    </h1>
+    <section>
+      <!--* Geräte suchen und Auflisten -->
+      <h1 style="margin-top: 0px; margin-bottom: 10px">Gefundene Geräte</h1>
 
-    @if(bleDevicesLoading) {
-    <p>Loading ...</p>
-    }
-    <!--  -->
-
-    <div class="divList">
-      @for (device of bleDevices(); track device.device.deviceId) {
-      <div class="border-radius">
-        <p style="margin: 5px">Name: {{device.device.name}}</p>
-        <p style="margin: 5px">ID: {{device.device.deviceId}}</p>
-        <p style="margin: 5px">UUIDs: {{device.device.uuids}}</p>
-        <p style="margin: 5px">RSSI: {{device.rssi}}</p>
-
-        <ion-button (click)="bleService.connectToBleDevice(device)"
-          >Verbinden</ion-button
-        >
-      </div>
+      @if(bleDevicesLoading) {
+      <p>Scanning ...</p>
+      } @else {
+      <ion-button (click)="loadBleDevices()">Erneut suchen</ion-button>
       }
-    </div>
-    } @else if (bleService.currentDevice$ | async; as currentDevice) {
-    <h2>{{currentDevice.device.name}}</h2>
-    <p style="margin: 5px">ID: {{currentDevice.device.deviceId}}</p>
+      <!--  -->
 
-    <div class="divList">
-      <div class="border-radius">
-        <ion-button (click)="bleService.disconnectFromBleDevice()"
-          >Verbindung trennen</ion-button
-        >
+      <div class="divList">
+        @for (device of bleDevices(); track device.device.deviceId) {
+        <div class="border-radius">
+          <p style="margin: 5px">Name: {{device.device.name}}</p>
+          <p style="margin: 5px">ID: {{device.device.deviceId}}</p>
+          <p style="margin: 5px">UUIDs: {{device.device.uuids}}</p>
+          <p style="margin: 5px">RSSI: {{device.rssi}}</p>
+
+          <ion-button (click)="bleService.connectToBleDevice(device)"
+            >Verbinden</ion-button
+          >
+        </div>
+        }
       </div>
-    </div>
+
+      @if(!bleDevicesLoading && bleDevices().length === 0) {
+      <p>Kein Gerät gefunden</p>
+      }
+    </section>
+    } @else if (bleService.currentDevice$ | async; as currentDevice) {
+    <section>
+      <!--* mit Gerät verbunden -->
+
+      <h1>{{currentDevice.device.name}}</h1>
+      <p style="margin: 5px">ID: {{currentDevice.device.deviceId}}</p>
+
+      <div class="divList">
+        <div class="border-radius">
+          <ion-button (click)="bleService.disconnectFromBleDevice()"
+            >Verbindung trennen</ion-button
+          >
+        </div>
+      </div>
+    </section>
     }
   </section>
 </ion-content>
