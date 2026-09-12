@@ -57,36 +57,34 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
         /*** Service ***/
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = &gatt_svr_svc_uuid.u,
-        .characteristics = (struct ble_gatt_chr_def[])
-        { {
-                /*** This characteristic can be subscribed to by writing 0x00 and 0x01 to the CCCD ***/
-                .uuid = &gatt_svr_chr_uuid.u,
-                .access_cb = gatt_svc_access,
+        .characteristics = (struct ble_gatt_chr_def[]){{
+                                                           /*** This characteristic can be subscribed to by writing 0x00 and 0x01 to the CCCD ***/
+                                                           .uuid = &gatt_svr_chr_uuid.u,
+                                                           .access_cb = gatt_svc_access,
 #if CONFIG_EXAMPLE_ENCRYPTION
-                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
-                BLE_GATT_CHR_F_READ_ENC | BLE_GATT_CHR_F_WRITE_ENC |
-                BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_INDICATE,
+                                                           .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
+                                                                    BLE_GATT_CHR_F_READ_ENC | BLE_GATT_CHR_F_WRITE_ENC |
+                                                                    BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_INDICATE,
 #else
-                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_INDICATE,
+                                                           .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_INDICATE,
 #endif
-                .val_handle = &gatt_svr_chr_val_handle,
-                .descriptors = (struct ble_gatt_dsc_def[])
-                { {
-                      .uuid = &gatt_svr_dsc_uuid.u,
+                                                           .val_handle = &gatt_svr_chr_val_handle,
+                                                           .descriptors = (struct ble_gatt_dsc_def[]){{
+                                                                                                          .uuid = &gatt_svr_dsc_uuid.u,
 #if CONFIG_EXAMPLE_ENCRYPTION
-                      .att_flags = BLE_ATT_F_READ | BLE_ATT_F_READ_ENC,
+                                                                                                          .att_flags = BLE_ATT_F_READ | BLE_ATT_F_READ_ENC,
 #else
-                      .att_flags = BLE_ATT_F_READ,
+                                                                                                          .att_flags = BLE_ATT_F_READ,
 #endif
-                      .access_cb = gatt_svc_access,
-                    }, {
-                      0, /* No more descriptors in this characteristic */
-                    }
-                },
-            }, {
-                0, /* No more characteristics in this service. */
-            }
-        },
+                                                                                                          .access_cb = gatt_svc_access,
+                                                                                                      },
+                                                                                                      {
+                                                                                                          0, /* No more descriptors in this characteristic */
+                                                                                                      }},
+                                                       },
+                                                       {
+                                                           0, /* No more characteristics in this service. */
+                                                       }},
     },
 
     {
@@ -102,12 +100,14 @@ gatt_svr_write(struct os_mbuf *om, uint16_t min_len, uint16_t max_len,
     int rc;
 
     om_len = OS_MBUF_PKTLEN(om);
-    if (om_len < min_len || om_len > max_len) {
+    if (om_len < min_len || om_len > max_len)
+    {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
 
     rc = ble_hs_mbuf_to_flat(om, dst, max_len, len);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         return BLE_ATT_ERR_UNLIKELY;
     }
 
@@ -132,17 +132,22 @@ gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
     const ble_uuid_t *uuid;
     int rc;
 
-    switch (ctxt->op) {
+    switch (ctxt->op)
+    {
     case BLE_GATT_ACCESS_OP_READ_CHR:
-        if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        if (conn_handle != BLE_HS_CONN_HANDLE_NONE)
+        {
             MODLOG_DFLT(INFO, "Characteristic read; conn_handle=%d attr_handle=%d\n",
                         conn_handle, attr_handle);
-        } else {
+        }
+        else
+        {
             MODLOG_DFLT(INFO, "Characteristic read by NimBLE stack; attr_handle=%d\n",
                         attr_handle);
         }
         uuid = ctxt->chr->uuid;
-        if (attr_handle == gatt_svr_chr_val_handle) {
+        if (attr_handle == gatt_svr_chr_val_handle)
+        {
             rc = os_mbuf_append(ctxt->om,
                                 &gatt_svr_chr_val,
                                 sizeof(gatt_svr_chr_val));
@@ -151,36 +156,44 @@ gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
         goto unknown;
 
     case BLE_GATT_ACCESS_OP_WRITE_CHR:
-        if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        if (conn_handle != BLE_HS_CONN_HANDLE_NONE)
+        {
             MODLOG_DFLT(INFO, "Characteristic write; conn_handle=%d attr_handle=%d",
                         conn_handle, attr_handle);
-        } else {
+        }
+        else
+        {
             MODLOG_DFLT(INFO, "Characteristic write by NimBLE stack; attr_handle=%d",
                         attr_handle);
         }
         uuid = ctxt->chr->uuid;
-        if (attr_handle == gatt_svr_chr_val_handle) {
+        if (attr_handle == gatt_svr_chr_val_handle)
+        {
             rc = gatt_svr_write(ctxt->om,
                                 sizeof(gatt_svr_chr_val),
                                 sizeof(gatt_svr_chr_val),
                                 &gatt_svr_chr_val, NULL);
             ble_gatts_chr_updated(attr_handle);
             MODLOG_DFLT(INFO, "Notification/Indication scheduled for "
-                        "all subscribed peers.\n");
+                              "all subscribed peers.\n");
             return rc;
         }
         goto unknown;
 
     case BLE_GATT_ACCESS_OP_READ_DSC:
-        if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        if (conn_handle != BLE_HS_CONN_HANDLE_NONE)
+        {
             MODLOG_DFLT(INFO, "Descriptor read; conn_handle=%d attr_handle=%d\n",
                         conn_handle, attr_handle);
-        } else {
+        }
+        else
+        {
             MODLOG_DFLT(INFO, "Descriptor read by NimBLE stack; attr_handle=%d\n",
                         attr_handle);
         }
         uuid = ctxt->dsc->uuid;
-        if (ble_uuid_cmp(uuid, &gatt_svr_dsc_uuid.u) == 0) {
+        if (ble_uuid_cmp(uuid, &gatt_svr_dsc_uuid.u) == 0)
+        {
             rc = os_mbuf_append(ctxt->om,
                                 &gatt_svr_dsc_val,
                                 sizeof(gatt_svr_chr_val));
@@ -203,12 +216,12 @@ unknown:
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-void
-gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
+void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
 {
     char buf[BLE_UUID_STR_LEN];
 
-    switch (ctxt->op) {
+    switch (ctxt->op)
+    {
     case BLE_GATT_REGISTER_OP_SVC:
         MODLOG_DFLT(DEBUG, "registered service %s with handle=%d\n",
                     ble_uuid_to_str(ctxt->svc.svc_def->uuid, buf),
@@ -217,7 +230,7 @@ gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
 
     case BLE_GATT_REGISTER_OP_CHR:
         MODLOG_DFLT(DEBUG, "registering characteristic %s with "
-                    "def_handle=%d val_handle=%d\n",
+                           "def_handle=%d val_handle=%d\n",
                     ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf),
                     ctxt->chr.def_handle,
                     ctxt->chr.val_handle);
@@ -235,8 +248,7 @@ gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
     }
 }
 
-int
-gatt_svr_init(void)
+int gatt_svr_init(void)
 {
     int rc;
 
@@ -251,12 +263,14 @@ gatt_svr_init(void)
 #endif
 
     rc = ble_gatts_count_cfg(gatt_svr_svcs);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         return rc;
     }
 
     rc = ble_gatts_add_svcs(gatt_svr_svcs);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         return rc;
     }
 

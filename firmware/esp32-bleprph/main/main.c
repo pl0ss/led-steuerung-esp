@@ -17,7 +17,6 @@
  * under the License.
  */
 
-#include "esp_log.h"
 #include "nvs_flash.h"
 /* BLE */
 #include "nimble/nimble_port.h"
@@ -30,10 +29,35 @@
 
 #if CONFIG_EXAMPLE_EXTENDED_ADV
 static uint8_t ext_adv_pattern_1[] = {
-    0x02, BLE_HS_ADV_TYPE_FLAGS, 0x06,
-    0x03, BLE_HS_ADV_TYPE_COMP_UUIDS16, 0xab, 0xcd,
-    0x03, BLE_HS_ADV_TYPE_COMP_UUIDS16, 0x18, 0x11,
-    0x11, BLE_HS_ADV_TYPE_COMP_NAME, 'n', 'i', 'm', 'b', 'l', 'e', '-', 'b', 'l', 'e', 'p', 'r', 'p', 'h', '-', 'e',
+    0x02,
+    BLE_HS_ADV_TYPE_FLAGS,
+    0x06,
+    0x03,
+    BLE_HS_ADV_TYPE_COMP_UUIDS16,
+    0xab,
+    0xcd,
+    0x03,
+    BLE_HS_ADV_TYPE_COMP_UUIDS16,
+    0x18,
+    0x11,
+    0x11,
+    BLE_HS_ADV_TYPE_COMP_NAME,
+    'n',
+    'i',
+    'm',
+    'b',
+    'l',
+    'e',
+    '-',
+    'b',
+    'l',
+    'e',
+    'p',
+    'r',
+    'p',
+    'h',
+    '-',
+    'e',
 };
 #endif
 
@@ -72,7 +96,7 @@ bleprph_print_conn_desc(struct ble_gap_conn_desc *desc)
                 desc->peer_id_addr.type);
     print_addr(desc->peer_id_addr.val);
     MODLOG_DFLT(INFO, " conn_itvl=%d conn_latency=%d supervision_timeout=%d "
-                "encrypted=%d authenticated=%d bonded=%d\n",
+                      "encrypted=%d authenticated=%d bonded=%d\n",
                 desc->conn_itvl, desc->conn_latency,
                 desc->supervision_timeout,
                 desc->sec_state.encrypted,
@@ -96,12 +120,13 @@ ext_bleprph_advertise(void)
     int rc;
 
     /* First check if any instance is already active */
-    if(ble_gap_ext_adv_active(instance)) {
+    if (ble_gap_ext_adv_active(instance))
+    {
         return;
     }
 
     /* use defaults for non-set params */
-    memset (&params, 0, sizeof(params));
+    memset(&params, 0, sizeof(params));
 
     /* enable connectable advertising */
     params.connectable = 1;
@@ -120,7 +145,7 @@ ext_bleprph_advertise(void)
     /* configure instance 0 */
     rc = ble_gap_ext_adv_configure(instance, &params, NULL,
                                    bleprph_gap_event, NULL);
-    assert (rc == 0);
+    assert(rc == 0);
 
     /* in this case only scan response is allowed */
 
@@ -133,11 +158,11 @@ ext_bleprph_advertise(void)
     assert(rc == 0);
 
     rc = ble_gap_ext_adv_set_data(instance, data);
-    assert (rc == 0);
+    assert(rc == 0);
 
     /* start advertising */
     rc = ble_gap_ext_adv_start(instance, 0, 0);
-    assert (rc == 0);
+    assert(rc == 0);
 }
 #else
 /**
@@ -186,14 +211,14 @@ bleprph_advertise(void)
     fields.name_is_complete = 1;
 #endif
 
-    fields.uuids16 = (ble_uuid16_t[]) {
-        BLE_UUID16_INIT(GATT_SVR_SVC_ALERT_UUID)
-    };
+    fields.uuids16 = (ble_uuid16_t[]){
+        BLE_UUID16_INIT(GATT_SVR_SVC_ALERT_UUID)};
     fields.num_uuids16 = 1;
     fields.uuids16_is_complete = 1;
 
     rc = ble_gap_adv_set_fields(&fields);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         MODLOG_DFLT(ERROR, "error setting advertisement data; rc=%d\n", rc);
         return;
     }
@@ -204,7 +229,8 @@ bleprph_advertise(void)
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
     rc = ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER,
                            &adv_params, bleprph_gap_event, NULL);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         MODLOG_DFLT(ERROR, "error enabling advertisement; rc=%d\n", rc);
         return;
     }
@@ -216,11 +242,11 @@ static void bleprph_power_control(uint16_t conn_handle)
 {
     int rc;
 
-    rc = ble_gap_read_remote_transmit_power_level(conn_handle, 0x01 );  // Attempting on LE 1M phy
-    assert (rc == 0);
+    rc = ble_gap_read_remote_transmit_power_level(conn_handle, 0x01); // Attempting on LE 1M phy
+    assert(rc == 0);
 
     rc = ble_gap_set_transmit_power_reporting_enable(conn_handle, 0x1, 0x1);
-    assert (rc == 0);
+    assert(rc == 0);
 }
 #endif
 
@@ -247,7 +273,8 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
     int rc;
 #endif
 
-    switch (event->type) {
+    switch (event->type)
+    {
 
 #if NIMBLE_BLE_CONNECT
     case BLE_GAP_EVENT_CONNECT:
@@ -255,14 +282,16 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
         MODLOG_DFLT(INFO, "connection %s; status=%d ",
                     event->connect.status == 0 ? "established" : "failed",
                     event->connect.status);
-        if (event->connect.status == 0) {
+        if (event->connect.status == 0)
+        {
             rc = ble_gap_conn_find(event->connect.conn_handle, &desc);
             assert(rc == 0);
             bleprph_print_conn_desc(&desc);
         }
         MODLOG_DFLT(INFO, "\n");
 
-        if (event->connect.status != 0) {
+        if (event->connect.status != 0)
+        {
             /* Connection failed; resume advertising. */
 #if CONFIG_EXAMPLE_EXTENDED_ADV
             ext_bleprph_advertise();
@@ -272,7 +301,7 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
         }
 
 #if MYNEWT_VAL(BLE_POWER_CONTROL)
-	bleprph_power_control(event->connect.conn_handle);
+        bleprph_power_control(event->connect.conn_handle);
 #endif
         return 0;
 
@@ -321,7 +350,7 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
 
     case BLE_GAP_EVENT_NOTIFY_TX:
         MODLOG_DFLT(INFO, "notify_tx event; conn_handle=%d attr_handle=%d "
-                    "status=%d is_indication=%d",
+                          "status=%d is_indication=%d",
                     event->notify_tx.conn_handle,
                     event->notify_tx.attr_handle,
                     event->notify_tx.status,
@@ -330,7 +359,7 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
 
     case BLE_GAP_EVENT_SUBSCRIBE:
         MODLOG_DFLT(INFO, "subscribe event; conn_handle=%d attr_handle=%d "
-                    "reason=%d prevn=%d curn=%d previ=%d curi=%d\n",
+                          "reason=%d prevn=%d curn=%d previ=%d curi=%d\n",
                     event->subscribe.conn_handle,
                     event->subscribe.attr_handle,
                     event->subscribe.reason,
@@ -368,7 +397,8 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
         struct ble_sm_io pkey = {0};
         int key = 0;
 
-        if (event->passkey.params.action == BLE_SM_IOACT_DISP) {
+        if (event->passkey.params.action == BLE_SM_IOACT_DISP)
+        {
             pkey.action = event->passkey.params.action;
             /* WARNING: Hardcoded passkey for demonstration only.
              * In production, generate a random passkey per pairing. */
@@ -376,32 +406,45 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGI(tag, "Enter passkey %" PRIu32 "on the peer side", pkey.passkey);
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(tag, "ble_sm_inject_io result: %d", rc);
-        } else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
-            ESP_LOGI(tag, "Passkey on device's display: %" PRIu32 , event->passkey.params.numcmp);
+        }
+        else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP)
+        {
+            ESP_LOGI(tag, "Passkey on device's display: %" PRIu32, event->passkey.params.numcmp);
             ESP_LOGI(tag, "Accept or reject the passkey through console in this format -> key Y or key N");
             pkey.action = event->passkey.params.action;
-            if (scli_receive_key(&key)) {
+            if (scli_receive_key(&key))
+            {
                 pkey.numcmp_accept = key;
-            } else {
+            }
+            else
+            {
                 pkey.numcmp_accept = 0;
                 ESP_LOGE(tag, "Timeout! Rejecting the key");
             }
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(tag, "ble_sm_inject_io result: %d", rc);
-        } else if (event->passkey.params.action == BLE_SM_IOACT_OOB) {
+        }
+        else if (event->passkey.params.action == BLE_SM_IOACT_OOB)
+        {
             static uint8_t tem_oob[16] = {0};
             pkey.action = event->passkey.params.action;
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < 16; i++)
+            {
                 pkey.oob[i] = tem_oob[i];
             }
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(tag, "ble_sm_inject_io result: %d", rc);
-        } else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
+        }
+        else if (event->passkey.params.action == BLE_SM_IOACT_INPUT)
+        {
             ESP_LOGI(tag, "Enter the passkey through console in this format-> key 123456");
             pkey.action = event->passkey.params.action;
-            if (scli_receive_key(&key)) {
+            if (scli_receive_key(&key))
+            {
                 pkey.passkey = key;
-            } else {
+            }
+            else
+            {
                 pkey.passkey = 0;
                 ESP_LOGE(tag, "Timeout! Passing 0 as the key");
             }
@@ -423,49 +466,52 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
 #if MYNEWT_VAL(BLE_POWER_CONTROL)
     case BLE_GAP_EVENT_TRANSMIT_POWER:
         MODLOG_DFLT(INFO, "Transmit power event : status=%d conn_handle=%d reason=%d "
-                           "phy=%d power_level=%x power_level_flag=%d delta=%d",
-                     event->transmit_power.status,
-                     event->transmit_power.conn_handle,
-                     event->transmit_power.reason,
-                     event->transmit_power.phy,
-                     event->transmit_power.transmit_power_level,
-                     event->transmit_power.transmit_power_level_flag,
-                     event->transmit_power.delta);
+                          "phy=%d power_level=%x power_level_flag=%d delta=%d",
+                    event->transmit_power.status,
+                    event->transmit_power.conn_handle,
+                    event->transmit_power.reason,
+                    event->transmit_power.phy,
+                    event->transmit_power.transmit_power_level,
+                    event->transmit_power.transmit_power_level_flag,
+                    event->transmit_power.delta);
         return 0;
 
     case BLE_GAP_EVENT_PATHLOSS_THRESHOLD:
         MODLOG_DFLT(INFO, "Pathloss threshold event : conn_handle=%d current path loss=%d "
-                           "zone_entered =%d",
-                     event->pathloss_threshold.conn_handle,
-                     event->pathloss_threshold.current_path_loss,
-                     event->pathloss_threshold.zone_entered);
+                          "zone_entered =%d",
+                    event->pathloss_threshold.conn_handle,
+                    event->pathloss_threshold.current_path_loss,
+                    event->pathloss_threshold.zone_entered);
         return 0;
 #endif
 
 #if MYNEWT_VAL(BLE_EATT_CHAN_NUM) > 0
     case BLE_GAP_EVENT_EATT:
         MODLOG_DFLT(INFO, "EATT %s : conn_handle=%d cid=%d",
-                event->eatt.status ? "disconnected" : "connected",
-                event->eatt.conn_handle,
-                event->eatt.cid);
-	if (event->eatt.status) {
-		/* Abort if disconnected */
-		return 0;
-	}
-	cids[bearers] = event->eatt.cid;
-	bearers += 1;
-	if (bearers != MYNEWT_VAL(BLE_EATT_CHAN_NUM)) {
-		/* Wait until all EATT bearers are connected before proceeding */
-		return 0;
-	}
-	/* Set the default bearer to use for further procedures */
-	rc = ble_att_set_default_bearer_using_cid(event->eatt.conn_handle, cids[0]);
-	if (rc != 0) {
-		MODLOG_DFLT(INFO, "Cannot set default EATT bearer, rc = %d\n", rc);
-		return rc;
-	}
+                    event->eatt.status ? "disconnected" : "connected",
+                    event->eatt.conn_handle,
+                    event->eatt.cid);
+        if (event->eatt.status)
+        {
+            /* Abort if disconnected */
+            return 0;
+        }
+        cids[bearers] = event->eatt.cid;
+        bearers += 1;
+        if (bearers != MYNEWT_VAL(BLE_EATT_CHAN_NUM))
+        {
+            /* Wait until all EATT bearers are connected before proceeding */
+            return 0;
+        }
+        /* Set the default bearer to use for further procedures */
+        rc = ble_att_set_default_bearer_using_cid(event->eatt.conn_handle, cids[0]);
+        if (rc != 0)
+        {
+            MODLOG_DFLT(INFO, "Cannot set default EATT bearer, rc = %d\n", rc);
+            return rc;
+        }
 
-	return 0;
+        return 0;
 #endif
 
 #if MYNEWT_VAL(BLE_CONN_SUBRATING)
@@ -525,7 +571,8 @@ bleprph_on_sync(void)
 
     /* Figure out address to use while advertising (no privacy for now) */
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         MODLOG_DFLT(ERROR, "error determining address type; rc=%d\n", rc);
         return;
     }
@@ -554,21 +601,22 @@ void bleprph_host_task(void *param)
     nimble_port_freertos_deinit();
 }
 
-void
-app_main(void)
+void app_main(void)
 {
     int rc;
 
     /* Initialize NVS — it is used to store PHY calibration data */
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
 
     ret = nimble_port_init();
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(tag, "Failed to init nimble %d ", ret);
         return;
     }
@@ -625,13 +673,15 @@ app_main(void)
 
     /* Initialize command line interface to accept input from user */
     rc = scli_init();
-    if (rc != ESP_OK) {
+    if (rc != ESP_OK)
+    {
         ESP_LOGE(tag, "scli_init() failed");
     }
 
 #if MYNEWT_VAL(BLE_EATT_CHAN_NUM) > 0
     bearers = 0;
-    for (int i = 0; i < MYNEWT_VAL(BLE_EATT_CHAN_NUM); i++) {
+    for (int i = 0; i < MYNEWT_VAL(BLE_EATT_CHAN_NUM); i++)
+    {
         cids[i] = 0;
     }
 #endif
