@@ -14,6 +14,10 @@ repo/
 - - next-ionic/
 - - angular-ionic/
 
+# Hardware
+
+https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-Cores/dp/B0DHRV7784/
+
 # First Installation
 
 ## ESP IDF Example Projekt auswählen
@@ -40,3 +44,8 @@ repo/
 - npm run build:android
 - npx cap open ios
 - npx cap open android
+- (siehe makefile)
+
+### Icons
+
+- https://ionic.io/ionicons
