@@ -46,6 +46,21 @@ https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-
 - npx cap open android
 - (siehe makefile)
 
+## react-ionic App
+
+- VSC: WebNative Extension
+- React+lonic
+- Targets: Web, iOS, Android
+- Template: tabs
+
+- ionic serve
+
+- npm run build:ios
+- npm run build:android
+- npx cap open ios
+- npx cap open android
+- (siehe makefile)
+
 ### Icons
 
 - https://ionic.io/ionicons
