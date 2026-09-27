@@ -1,4 +1,14 @@
 dependencies:
+  espressif/cjson:
+    component_hash: e788323270d90738662d66fffa910bfe1fba019bba087f01557e70c40485b469
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.7.19~2
   idf:
     source:
       type: idf
@@ -10,7 +20,8 @@ dependencies:
       type: local
     version: '*'
 direct_dependencies:
+- espressif/cjson
 - nimble_peripheral_utils
-manifest_hash: c28d41453286b749d7e5a8b76d4a8cdf22df54db4ac4384a3371eb4f67a0b54c
+manifest_hash: 9507a29652f3a923f72e7a22b302f432d1a8ed626eea2f92eb1e514c65329662
 target: esp32
 version: 3.0.0

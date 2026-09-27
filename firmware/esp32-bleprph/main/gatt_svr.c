@@ -26,6 +26,9 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include "bleprph.h"
 #include "services/ans/ble_svc_ans.h"
+#include "ble_protocol.h"
+#include "ble_write_handler.h"
+#include "ble_read_handler.h"
 
 /*** Maximum number of characteristics with the notify flag ***/
 #define MAX_NOTIFY 5
@@ -46,6 +49,11 @@ static uint8_t gatt_svr_dsc_val;
 static const ble_uuid128_t gatt_svr_dsc_uuid =
     BLE_UUID128_INIT(0x01, 0x01, 0x01, 0x01, 0x12, 0x12, 0x12, 0x12,
                      0x23, 0x23, 0x23, 0x23, 0x34, 0x34, 0x34, 0x34);
+
+/* Command (write-only) and query (read+write) characteristics, see
+ * ble_write_handler.c / ble_read_handler.c for what they actually do. */
+static const ble_uuid128_t ble_cmd_chr_uuid = BLE_CMD_CHR_UUID;
+static const ble_uuid128_t ble_query_chr_uuid = BLE_QUERY_CHR_UUID;
 
 static int
 gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
@@ -81,6 +89,20 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
                                                                                                       {
                                                                                                           0, /* No more descriptors in this characteristic */
                                                                                                       }},
+                                                       },
+                                                       {
+                                                           /*** Write-only "command" channel, see ble_write_handler.c ***/
+                                                           .uuid = &ble_cmd_chr_uuid.u,
+                                                           .access_cb = ble_write_handler_access_cb,
+                                                           .flags = BLE_GATT_CHR_F_WRITE,
+                                                           .val_handle = &ble_write_handler_chr_val_handle,
+                                                       },
+                                                       {
+                                                           /*** Read+write "query" channel, see ble_read_handler.c ***/
+                                                           .uuid = &ble_query_chr_uuid.u,
+                                                           .access_cb = ble_read_handler_access_cb,
+                                                           .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE,
+                                                           .val_handle = &ble_read_handler_chr_val_handle,
                                                        },
                                                        {
                                                            0, /* No more characteristics in this service. */
