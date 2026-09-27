@@ -3,6 +3,7 @@ import {
   BleClient,
   ScanMode,
   ScanResult,
+  TimeoutOptions,
 } from '@capacitor-community/bluetooth-le';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { BleUuid } from 'src/app/enums/ble-uuid.enum';
@@ -93,5 +94,126 @@ export class BleService {
     if (!currentDevice) return;
 
     await BleClient.disconnect(currentDevice.device.deviceId);
+  }
+
+  /**
+   * generische write Wrapper
+   * @param deviceId
+   * @param service
+   * @param characteristic
+   * @param value
+   * @param options
+   * @returns
+   */
+  public async write(
+    deviceId: string,
+    service: string,
+    characteristic: string,
+    value: DataView,
+    options?: TimeoutOptions,
+  ): Promise<void> {
+    await this.initPromise;
+    return BleClient.write(deviceId, service, characteristic, value, options);
+  }
+
+  /**
+   * generische read Wrapper
+   * @param deviceId
+   * @param service
+   * @param characteristic
+   * @param options
+   * @returns
+   */
+  public async read(
+    deviceId: string,
+    service: string,
+    characteristic: string,
+    options?: TimeoutOptions,
+  ): Promise<DataView> {
+    await this.initPromise;
+    return BleClient.read(deviceId, service, characteristic, options);
+  }
+
+  /**
+   * Prüft, ob device verbunden ist
+   * @returns
+   */
+  private requireDeviceId(): string {
+    const device = this.currentDeviceSubject.value;
+    if (!device) {
+      throw new Error('Kein BLE Gerät verbunden');
+    }
+    return device.device.deviceId;
+  }
+
+  private writeCommand(
+    value: DataView,
+    options?: TimeoutOptions,
+  ): Promise<void> {
+    return this.write(
+      this.requireDeviceId(),
+      BleUuid.CustomService,
+      BleUuid.CommandCharacteristic,
+      value,
+      options,
+    );
+  }
+
+  private writeQuery(value: DataView, options?: TimeoutOptions): Promise<void> {
+    return this.write(
+      this.requireDeviceId(),
+      BleUuid.CustomService,
+      BleUuid.QueryCharacteristic,
+      value,
+      options,
+    );
+  }
+
+  private readQuery(options?: TimeoutOptions): Promise<DataView> {
+    return this.read(
+      this.requireDeviceId(),
+      BleUuid.CustomService,
+      BleUuid.QueryCharacteristic,
+      options,
+    );
+  }
+
+  //* JSON Protokoll Ebene, spiegelt gatt_svr / ble_write_handler / ble_read_handler
+
+  /**
+   * Sendet Kommando
+   * @param type
+   * @param payload
+   * @returns
+   */
+  public sendCommand(type: string, payload?: unknown): Promise<void> {
+    return this.writeCommand(this.encodeJson({ type, payload }));
+  }
+
+  /**
+   * Wählt einen Endpoint aus und liest dessen JSON
+   * @param endpoint
+   * @param options
+   * @returns
+   */
+  public async queryEndpoint<T = unknown>(
+    endpoint: string,
+    options?: TimeoutOptions,
+  ): Promise<T> {
+    await this.writeQuery(this.encodeJson({ endpoint }), options);
+    const response = await this.readQuery(options);
+    const parsed = this.decodeJson<{ endpoint: string; data: T }>(response);
+    return parsed.data;
+  }
+
+  //* Utils
+  private encodeJson(value: unknown): DataView {
+    const json = JSON.stringify(value);
+    return new DataView(new TextEncoder().encode(json).buffer);
+  }
+
+  private decodeJson<T>(value: DataView): T {
+    const json = new TextDecoder().decode(value.buffer);
+    return JSON.parse(json) as T;
   }
 }

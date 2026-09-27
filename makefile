@@ -1,4 +1,4 @@
-.PHONY: app_angular_ionic fa app_angular_ionic_local app_angular_ionic_ios fai
+.PHONY: app_angular_ionic aa app_angular_ionic_local app_angular_ionic_ios aai app_angular_ionic_android aaa app_react_ionic ar app_react_ionic_local app_react_ionic_ios ari app_react_ionic_android ara
 
 app_angular_ionic:
 	cd ./apps/angular-ionic && ionic serve
