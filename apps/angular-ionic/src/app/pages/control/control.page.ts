@@ -36,5 +36,40 @@ export class ControlPage implements OnInit {
       await this.bleService.getDevicesBleScan({ scanDurationMs: 3000 }),
     );
     this.bleDevicesLoading = false;
+
+    this.bleService.connectToBleDevice(this.bleDevices()[0]);
+  }
+
+  async testBleProtocol(): Promise<void> {
+    try {
+      // // 1. Gerät suchen und verbinden
+      // const results = await this.bleService.getDevicesBleScan({
+      //   scanDurationMs: 5000,
+      // });
+      // if (results.length === 0) {
+      //   console.warn('Kein passendes Gerät gefunden');
+      //   return;
+      // }
+
+      // await this.bleService.connectToBleDevice(results[0]);
+      // console.log('Verbunden mit', results[0].device.deviceId);
+
+      // 2. Command Kanal testen: sollte auf dem ESP im Log "ping received" auslösen
+      await this.bleService.sendCommand('ping');
+      console.log('ping gesendet');
+
+      // 3. Query Kanal testen: sollte { uptime_ms, free_heap } zurückgeben
+      const status =
+        await this.bleService.queryEndpoint<StatusResponse>('status');
+      console.log('status Endpoint:', status);
+
+      // 4. Noch nicht implementierten Endpoint testen: sollte { implemented: false } zurückgeben
+      const color = await this.bleService.queryEndpoint('color');
+      console.log('color Endpoint:', color);
+    } catch (error) {
+      console.error('BLE Test fehlgeschlagen', error);
+    } finally {
+      // await this.bleService.disconnectFromBleDevice();
+    }
   }
 }
