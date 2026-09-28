@@ -29,7 +29,7 @@ export class BleService {
 
   private async initBle(): Promise<void> {
     try {
-      await BleClient.initialize();
+      await BleClient.initialize({ androidNeverForLocation: true });
     } catch (error) {
       console.error('BLE Initialisierung fehlgeschlagen', error);
       // Optional: Fehler weiterwerfen, damit initPromise rejected wird
