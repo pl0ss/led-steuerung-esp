@@ -25,6 +25,7 @@
 #include "host/ble_hs.h"
 #include "ble_write_handler.h"
 #include "ble_protocol.h"
+#include "led_strip_ctrl.h"
 
 static const char *TAG = "ble_write_handler";
 
@@ -50,15 +51,44 @@ static void handle_ping(const cJSON *payload)
     ESP_LOGI(TAG, "ping received");
 }
 
-// TODO
 /*
- * TODO(led): message types for LED control (e.g. "set_color",
- * "set_preset") go here once the LED driver exists. Intentionally not
- * implemented yet.
+ * Sets every LED on the strip to the same color:
+ *   { "type": "set_color", "payload": { "r": 255, "g": 0, "b": 0 } }
+ */
+static void handle_set_color(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "set_color message is missing a payload");
+        return;
+    }
+
+    const cJSON *r_json = cJSON_GetObjectItemCaseSensitive(payload, "r");
+    const cJSON *g_json = cJSON_GetObjectItemCaseSensitive(payload, "g");
+    const cJSON *b_json = cJSON_GetObjectItemCaseSensitive(payload, "b");
+
+    if (!cJSON_IsNumber(r_json) || !cJSON_IsNumber(g_json) || !cJSON_IsNumber(b_json))
+    {
+        ESP_LOGW(TAG, "set_color payload needs numeric \"r\", \"g\", \"b\" fields");
+        return;
+    }
+
+    uint8_t red = (uint8_t)r_json->valuedouble;
+    uint8_t green = (uint8_t)g_json->valuedouble;
+    uint8_t blue = (uint8_t)b_json->valuedouble;
+
+    ESP_LOGI(TAG, "set_color: r=%u g=%u b=%u", red, green, blue);
+    led_strip_ctrl_set_all(red, green, blue);
+}
+
+/*
+ * TODO(led): message types for presets (e.g. "set_preset") go here once
+ * presets exist. Intentionally not implemented yet.
  */
 
 static const ble_msg_type_entry_t msg_handlers[] = {
     {"ping", handle_ping},
+    {"set_color", handle_set_color},
 };
 
 /* --- dispatch --------------------------------------------------------------- */

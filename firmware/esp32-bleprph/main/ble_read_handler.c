@@ -26,6 +26,7 @@
 #include "host/ble_hs.h"
 #include "ble_read_handler.h"
 #include "ble_protocol.h"
+#include "led_strip_ctrl.h"
 
 static const char *TAG = "ble_read_handler";
 
@@ -56,10 +57,23 @@ static cJSON *handle_status(void)
     return data;
 }
 
+/* { "endpoint": "color", "data": { "r": ..., "g": ..., "b": ... } } */
+static cJSON *handle_color(void)
+{
+    uint8_t red, green, blue;
+    led_strip_ctrl_get_last_color(&red, &green, &blue);
+
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data, "r", red);
+    cJSON_AddNumberToObject(data, "g", green);
+    cJSON_AddNumberToObject(data, "b", blue);
+    return data;
+}
+
 /*
- * TODO(led): "color" and "preset" endpoints go here once the LED driver
- * exists. They already exist below so the app-side router has something to
- * call against, they just report that there is nothing to report yet.
+ * TODO(led): the "preset" endpoint goes here once presets exist. It
+ * already exists below so the app-side router has something to call
+ * against, it just reports that there is nothing to report yet.
  */
 static cJSON *handle_not_implemented(void)
 {
@@ -70,7 +84,7 @@ static cJSON *handle_not_implemented(void)
 
 static const ble_query_endpoint_t query_endpoints[] = {
     {"status", handle_status},
-    {"color", handle_not_implemented},
+    {"color", handle_color},
     {"preset", handle_not_implemented},
 };
 
@@ -168,7 +182,7 @@ static int handle_read_endpoint(struct ble_gatt_access_ctxt *ctxt)
 /* --- GATT access callback ------------------------------------------------------ */
 
 int ble_read_handler_access_cb(uint16_t conn_handle, uint16_t attr_handle,
-                                struct ble_gatt_access_ctxt *ctxt, void *arg)
+                               struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)conn_handle;
     (void)attr_handle;

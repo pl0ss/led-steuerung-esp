@@ -26,6 +26,7 @@
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
 #include "bleprph.h"
+#include "led_strip_ctrl.h"
 
 #if CONFIG_EXAMPLE_EXTENDED_ADV
 static uint8_t ext_adv_pattern_1[] = {
@@ -613,6 +614,14 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    /* Initialize the LED strip before BLE comes up, so a command arriving
+     * right after connect can already be applied. */
+    ret = led_strip_ctrl_init();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(tag, "Failed to init LED strip: %s", esp_err_to_name(ret));
+    }
 
     ret = nimble_port_init();
     if (ret != ESP_OK)

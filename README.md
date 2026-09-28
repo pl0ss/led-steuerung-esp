@@ -31,6 +31,11 @@ https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-
 - Project Name: esp32-bleprph
 - Enter Project directory: .../led-steuerung-esp/firmware
 
+### idf.py ausführen
+
+- VS Code mit ESP-IDF-Extension
+- Strg+Shift+P und "ESP-IDF: Open ESP-IDF Terminal" ausführen
+
 ## angular-ionic App
 
 - VSC: WebNative Extension
