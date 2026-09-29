@@ -1,7 +1,12 @@
 /*
  * Thin wrapper around the ESP-IDF "led_strip" component. Keeps every
  * strip-specific detail (GPIO pin, LED count, driver handle) in this one
- * file, so callers only ever deal with led_strip_ctrl_set_all().
+ * file, so callers only ever deal with the setters below.
+ *
+ * The strip has no native brightness control, so "brightness" is applied
+ * by scaling the base color before writing pixels. Color, brightness and
+ * active LED count are tracked independently and re-combined whenever any
+ * of them changes.
  */
 
 #ifndef H_LED_STRIP_CTRL_
@@ -24,17 +29,28 @@ extern "C"
 #define LED_STRIP_LED_COUNT 300
 
     /* Sets up the RMT peripheral and the led_strip driver, and clears the
-     * strip. Call once, before the first led_strip_ctrl_set_all(). */
+     * strip. Call once, before any of the setters below. */
     esp_err_t led_strip_ctrl_init(void);
 
-    /* Sets every LED on the strip to the same RGB color (0..255 each) and
-     * pushes the update out immediately. */
-    esp_err_t led_strip_ctrl_set_all(uint8_t red, uint8_t green, uint8_t blue);
+    /* Sets the base color (0..255 each). Combined with the current brightness
+     * and active LED count, then pushed out immediately. */
+    esp_err_t led_strip_ctrl_set_color(uint8_t red, uint8_t green, uint8_t blue);
 
-    /* Returns the color that was last requested via led_strip_ctrl_set_all(),
-     * so other code (e.g. the BLE "color" query endpoint) can report the
-     * current state without keeping its own copy. */
-    void led_strip_ctrl_get_last_color(uint8_t *red, uint8_t *green, uint8_t *blue);
+    /* Sets brightness as a percentage (0..100), values outside that range are
+     * clamped. Combined with the current color and active LED count, then
+     * pushed out immediately. */
+    esp_err_t led_strip_ctrl_set_brightness(uint8_t percent);
+
+    /* Sets how many LEDs (starting from index 0) should be lit, the rest is
+     * turned off. Values above LED_STRIP_LED_COUNT are clamped. Combined with
+     * the current color and brightness, then pushed out immediately. */
+    esp_err_t led_strip_ctrl_set_led_count(uint16_t count);
+
+    /* Reports the current state, so other code (e.g. the BLE query endpoints)
+     * can answer without keeping its own copy. */
+    void led_strip_ctrl_get_color(uint8_t *red, uint8_t *green, uint8_t *blue);
+    uint8_t led_strip_ctrl_get_brightness(void);
+    uint16_t led_strip_ctrl_get_led_count(void);
 
 #ifdef __cplusplus
 }

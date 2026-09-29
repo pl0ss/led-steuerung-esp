@@ -14,7 +14,7 @@
  * This channel gives you an ATT-level write acknowledgement (write, not
  * writeWithoutResponse, so BleClient.write()'s promise only resolves once
  * the ESP32 confirmed receipt), but no application-level answer: unknown or
- * malformed messages are only logged, ble_msg_handler_access_cb() still
+ * malformed messages are only logged, ble_write_handler_access_cb() still
  * returns success. Use the query characteristic (ble_read_handler.c)
  * whenever the app needs an actual answer back.
  */
@@ -51,6 +51,32 @@ static void handle_ping(const cJSON *payload)
     ESP_LOGI(TAG, "ping received");
 }
 
+/* Reads a single required numeric field out of payload, clamped into
+ * [0, max]. Returns false (and logs) if the field is missing/not a number. */
+static bool read_clamped_uint(const cJSON *payload, const char *field,
+                              long max_value, long *out_value)
+{
+    const cJSON *field_json = cJSON_GetObjectItemCaseSensitive(payload, field);
+    if (!cJSON_IsNumber(field_json))
+    {
+        ESP_LOGW(TAG, "message is missing a numeric \"%s\" field", field);
+        return false;
+    }
+
+    long value = (long)field_json->valuedouble;
+    if (value < 0)
+    {
+        value = 0;
+    }
+    else if (value > max_value)
+    {
+        value = max_value;
+    }
+
+    *out_value = value;
+    return true;
+}
+
 /*
  * Sets every LED on the strip to the same color:
  *   { "type": "set_color", "payload": { "r": 255, "g": 0, "b": 0 } }
@@ -78,7 +104,53 @@ static void handle_set_color(const cJSON *payload)
     uint8_t blue = (uint8_t)b_json->valuedouble;
 
     ESP_LOGI(TAG, "set_color: r=%u g=%u b=%u", red, green, blue);
-    led_strip_ctrl_set_all(red, green, blue);
+    led_strip_ctrl_set_color(red, green, blue);
+}
+
+/*
+ * Sets the overall brightness in percent (0..100), applied on top of the
+ * current color:
+ *   { "type": "set_brightness", "payload": { "brightness": 50 } }
+ */
+static void handle_set_brightness(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "set_brightness message is missing a payload");
+        return;
+    }
+
+    long brightness;
+    if (!read_clamped_uint(payload, "brightness", 100, &brightness))
+    {
+        return;
+    }
+
+    ESP_LOGI(TAG, "set_brightness: %ld%%", brightness);
+    led_strip_ctrl_set_brightness((uint8_t)brightness);
+}
+
+/*
+ * Sets how many LEDs (starting from index 0) should be lit, the rest is
+ * turned off:
+ *   { "type": "set_led_count", "payload": { "count": 150 } }
+ */
+static void handle_set_led_count(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "set_led_count message is missing a payload");
+        return;
+    }
+
+    long count;
+    if (!read_clamped_uint(payload, "count", LED_STRIP_LED_COUNT, &count))
+    {
+        return;
+    }
+
+    ESP_LOGI(TAG, "set_led_count: %ld", count);
+    led_strip_ctrl_set_led_count((uint16_t)count);
 }
 
 /*
@@ -89,6 +161,8 @@ static void handle_set_color(const cJSON *payload)
 static const ble_msg_type_entry_t msg_handlers[] = {
     {"ping", handle_ping},
     {"set_color", handle_set_color},
+    {"set_brightness", handle_set_brightness},
+    {"set_led_count", handle_set_led_count},
 };
 
 /* --- dispatch --------------------------------------------------------------- */

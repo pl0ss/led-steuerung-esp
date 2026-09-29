@@ -61,12 +61,29 @@ static cJSON *handle_status(void)
 static cJSON *handle_color(void)
 {
     uint8_t red, green, blue;
-    led_strip_ctrl_get_last_color(&red, &green, &blue);
+    led_strip_ctrl_get_color(&red, &green, &blue);
 
     cJSON *data = cJSON_CreateObject();
     cJSON_AddNumberToObject(data, "r", red);
     cJSON_AddNumberToObject(data, "g", green);
     cJSON_AddNumberToObject(data, "b", blue);
+    return data;
+}
+
+/* { "endpoint": "brightness", "data": { "percent": ... } } */
+static cJSON *handle_brightness(void)
+{
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data, "percent", led_strip_ctrl_get_brightness());
+    return data;
+}
+
+/* { "endpoint": "led_count", "data": { "count": ..., "max": ... } } */
+static cJSON *handle_led_count(void)
+{
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data, "count", led_strip_ctrl_get_led_count());
+    cJSON_AddNumberToObject(data, "max", LED_STRIP_LED_COUNT);
     return data;
 }
 
@@ -85,6 +102,8 @@ static cJSON *handle_not_implemented(void)
 static const ble_query_endpoint_t query_endpoints[] = {
     {"status", handle_status},
     {"color", handle_color},
+    {"brightness", handle_brightness},
+    {"led_count", handle_led_count},
     {"preset", handle_not_implemented},
 };
 
