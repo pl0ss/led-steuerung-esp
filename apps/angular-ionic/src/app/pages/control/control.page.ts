@@ -10,6 +10,7 @@ import { BleService } from 'src/app/services/ble.service';
 import { ScanResult } from '@capacitor-community/bluetooth-le';
 import { AsyncPipe } from '@angular/common';
 import { ColorPickerComponent } from 'src/app/components/color-picker.component';
+import { LedSliderComponent } from 'src/app/components/led-slider.component';
 
 @Component({
   selector: 'app-control',
@@ -23,6 +24,7 @@ import { ColorPickerComponent } from 'src/app/components/color-picker.component'
     IonButton,
     AsyncPipe,
     ColorPickerComponent,
+    LedSliderComponent,
   ],
 })
 export class ControlPage implements OnInit {

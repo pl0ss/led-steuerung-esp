@@ -58,6 +58,31 @@
 
           <div style="margin-top: 10px">
             <app-color-picker></app-color-picker>
+
+            <div style="margin-top: 10px">
+              <app-led-slider
+                label="Helligkeit"
+                [min]="0"
+                [max]="100"
+                [step]="5"
+                [value]="100"
+                unit="%"
+                commandType="set_brightness"
+                payloadKey="brightness"
+              ></app-led-slider>
+            </div>
+
+            <div style="margin-top: 10px">
+              <app-led-slider
+                label="Anzahl LEDs"
+                [min]="0"
+                [max]="300"
+                [step]="5"
+                [value]="300"
+                commandType="set_led_count"
+                payloadKey="count"
+              ></app-led-slider>
+            </div>
           </div>
         </div>
       </div>
