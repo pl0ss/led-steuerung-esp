@@ -1,15 +1,19 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import {
   BleClient,
+  BleDevice,
   ScanMode,
   ScanResult,
   TimeoutOptions,
 } from '@capacitor-community/bluetooth-le';
+import { Platform } from '@ionic/angular';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { BleUuid } from 'src/app/enums/ble-uuid.enum';
 
 @Injectable({ providedIn: 'root' })
 export class BleService {
+  public readonly platform = inject(Platform);
+
   private readonly initPromise: Promise<void>; // Promise wird gespeichert, damit alle Methoden auf die Initialisierung warten können
 
   private readonly connectedToADeviceSubject = new BehaviorSubject<boolean>(
@@ -49,30 +53,48 @@ export class BleService {
 
     const results: ScanResult[] = [];
 
-    await BleClient.requestLEScan(
-      {
-        allowDuplicates: false,
-        scanMode: ScanMode.SCAN_MODE_LOW_LATENCY,
-        services: services,
-      },
-      (res: ScanResult) => {
-        results.push(res);
-      },
-    );
+    if (this.platform.is('desktop')) {
+      //* Debug
+      const device: BleDevice = {
+        deviceId: 'dummy',
+        name: 'Dummy',
+      };
+      const res: ScanResult = {
+        device: device,
+      };
+      results.push(res);
+    } else {
+      //* Prod
+      await BleClient.requestLEScan(
+        {
+          allowDuplicates: false,
+          scanMode: ScanMode.SCAN_MODE_LOW_LATENCY,
+          services: services,
+        },
+        (res: ScanResult) => {
+          results.push(res);
+        },
+      );
 
-    // Scan läuft im Hintergrund weiter, deshalb hier eine feste Zeit warten
-    await new Promise((resolve) => setTimeout(resolve, scanDurationMs));
+      // Scan läuft im Hintergrund weiter, deshalb hier eine feste Zeit warten
+      await new Promise((resolve) => setTimeout(resolve, scanDurationMs));
 
-    await BleClient.stopLEScan();
+      await BleClient.stopLEScan();
+    }
 
     return results;
   }
 
   public async connectToBleDevice(device: ScanResult) {
     try {
-      await BleClient.connect(device.device.deviceId, () =>
-        this.onDisconnect(device.device.deviceId),
-      );
+      if (this.platform.is('desktop')) {
+        //* Debug
+      } else {
+        //* Prod
+        await BleClient.connect(device.device.deviceId, () =>
+          this.onDisconnect(device.device.deviceId),
+        );
+      }
 
       this.currentDeviceSubject.next(device);
       this.connectedToADeviceSubject.next(true);
