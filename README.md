@@ -20,6 +20,8 @@ Du möchtest das Projekt nachbauen oder darauf aufbauen? Sehr gerne, siehe [Mitm
 - [Mitmachen](#mitmachen)
 - [Erstinstallation (Doku zum Anlegen der Projekte)](#erstinstallation-doku-zum-anlegen-der-projekte)
 
+<img height="500" alt="rainbow" src="https://github.com/user-attachments/assets/117b4cb0-a6bd-4e13-a4a9-6e05ddc3ce27" />
+
 ## Projektstruktur
 
 Die Struktur ist ein möglicher Entwurf und kann sich noch ändern.
