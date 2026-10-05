@@ -28,6 +28,7 @@
         @for (device of bleDevices(); track device.device.deviceId) {
         <div class="border-radius">
           <p style="margin: 5px">Name: {{device.device.name}}</p>
+          <p style="margin: 5px">localName: {{device.localName}}</p>
           <p style="margin: 5px">ID: {{device.device.deviceId}}</p>
           <p style="margin: 5px">UUIDs: {{device.device.uuids}}</p>
           <p style="margin: 5px">RSSI: {{device.rssi}}</p>
