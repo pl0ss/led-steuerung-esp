@@ -30,6 +30,8 @@ import { LedSliderComponent } from 'src/app/components/led-slider.component';
 export class ControlPage implements OnInit {
   public readonly bleService = inject(BleService);
 
+  public readonly autoConnect: boolean = true;
+
   public readonly bleDevices = signal<ScanResult[]>([]);
   public bleDevicesLoading: boolean = true;
 
@@ -48,6 +50,17 @@ export class ControlPage implements OnInit {
     );
     this.bleDevicesLoading = false;
 
-    this.bleService.connectToBleDevice(this.bleDevices()[0]);
+    if (this.autoConnect) {
+      this.autoConnectToEsp();
+    }
+  }
+
+  /**
+   * Nur automatisch verbinden, wenn genau ein ESP gefunden wurde, da sich die App anonsten zufällig mit dem erst besten verbinden würde
+   */
+  public autoConnectToEsp() {
+    if (this.bleDevices().length == 1) {
+      this.bleService.connectToBleDevice(this.bleDevices()[0]);
+    }
   }
 }
