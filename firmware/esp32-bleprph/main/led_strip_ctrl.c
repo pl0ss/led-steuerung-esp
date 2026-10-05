@@ -11,6 +11,7 @@
 #include <math.h>
 #include "led_strip_ctrl.h"
 #include "led_strip.h"
+#include "led_strip_spi.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -29,7 +30,7 @@ static const char *TAG = "led_strip_ctrl";
 #define LED_STRIP_BRIGHTNESS_GAMMA 2.2
 
 /* How often the rainbow effect advances and redraws, in milliseconds. */
-#define LED_STRIP_RAINBOW_STEP_MS 30
+#define LED_STRIP_RAINBOW_STEP_MS 20
 
 typedef enum
 {
@@ -59,28 +60,39 @@ static uint8_t current_brightness_percent = 100;
  * the whole strip. */
 static uint16_t current_led_count = LED_STRIP_LED_COUNT;
 
-static uint8_t scale_channel(uint8_t value)
-{
-    if (current_brightness_percent == 0 || value == 0)
-    {
-        return 0;
-    }
+/* Maps a channel value (0..255) to its brightness-scaled value for the
+ * current brightness. Rebuilt only when the brightness changes, so the
+ * per-pixel path (up to 900 channel lookups per rainbow frame) is a plain
+ * array read instead of a software-emulated double pow() each time. */
+static uint8_t brightness_lut[256];
 
+/* Caller must hold state_mutex (or be in init, before any task exists). */
+static void rebuild_brightness_lut(void)
+{
     double linear_fraction = (double)current_brightness_percent / 100.0;
     double perceptual_fraction = pow(linear_fraction, LED_STRIP_BRIGHTNESS_GAMMA);
 
-    uint8_t scaled = (uint8_t)((double)value * perceptual_fraction + 0.5);
-
-    /* Only 0% itself should produce true black. Otherwise the gamma curve
-     * can round a still-lit channel all the way down to 0 at low
-     * percentages, which would again look like a hue shift instead of a
-     * dim, barely-there color. */
-    if (scaled == 0)
+    for (int value = 0; value < 256; value++)
     {
-        scaled = 1;
-    }
+        if (current_brightness_percent == 0 || value == 0)
+        {
+            brightness_lut[value] = 0;
+            continue;
+        }
 
-    return scaled;
+        uint8_t scaled = (uint8_t)((double)value * perceptual_fraction + 0.5);
+
+        /* Only 0% itself should produce true black. Otherwise the gamma
+         * curve can round a still-lit channel all the way down to 0 at low
+         * percentages, which would look like a hue shift instead of a dim,
+         * barely-there color. */
+        brightness_lut[value] = scaled == 0 ? 1 : scaled;
+    }
+}
+
+static uint8_t scale_channel(uint8_t value)
+{
+    return brightness_lut[value];
 }
 
 /* Standard integer HSV -> RGB conversion, h/s/v all 0..255. Used only by
@@ -152,6 +164,13 @@ static esp_err_t apply_state(void)
     uint8_t red = scale_channel(current_red);
     uint8_t green = scale_channel(current_green);
     uint8_t blue = scale_channel(current_blue);
+
+    /* Exactly what is handed to the driver, so you can compare it with the
+     * monitor output when the strip shows something unexpected: if these
+     * values are right but the strip is wrong, the problem is on the way
+     * to the strip (signal level, ground, power), not in this code. */
+    ESP_LOGI(TAG, "apply: r=%u g=%u b=%u (scaled) leds=%u brightness=%u%%",
+             red, green, blue, current_led_count, current_brightness_percent);
 
     for (int i = 0; i < LED_STRIP_LED_COUNT; i++)
     {
@@ -239,6 +258,8 @@ esp_err_t led_strip_ctrl_init(void)
         return ESP_ERR_NO_MEM;
     }
 
+    rebuild_brightness_lut();
+
     led_strip_config_t strip_config = {
         .strip_gpio_num = LED_STRIP_GPIO_PIN,
         .max_leds = LED_STRIP_LED_COUNT,
@@ -249,18 +270,27 @@ esp_err_t led_strip_ctrl_init(void)
         },
     };
 
-    led_strip_rmt_config_t rmt_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = 10 * 1000 * 1000, /* 10 MHz, i.e. a 0.1us RMT tick */
+    /* SPI backend with DMA instead of RMT. The RMT peripheral on the
+     * classic ESP32 has no DMA: a 300 LED frame (900 bytes) is fed through
+     * a tiny buffer that an interrupt keeps refilling. That interrupt runs
+     * on the same core as the BLE stack, and whenever BLE delays a refill
+     * the WS2812 bit timing breaks, which shows up as wrong colors (stuck
+     * until the next refresh) or flicker in an animation. SPI + DMA streams
+     * the whole frame from memory without the CPU, so BLE can't disturb it.
+     * The data pin is driven as SPI MOSI through the GPIO matrix, so any
+     * output-capable GPIO works. */
+    led_strip_spi_config_t spi_config = {
+        .clk_src = SPI_CLK_SRC_DEFAULT,
+        .spi_bus = SPI2_HOST,
         .flags = {
-            .with_dma = false,
+            .with_dma = true,
         },
     };
 
-    esp_err_t err = led_strip_new_rmt_device(&strip_config, &rmt_config, &strip);
+    esp_err_t err = led_strip_new_spi_device(&strip_config, &spi_config, &strip);
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "led_strip_new_rmt_device failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "led_strip_new_spi_device failed: %s", esp_err_to_name(err));
         return err;
     }
 
@@ -291,6 +321,7 @@ esp_err_t led_strip_ctrl_set_brightness(uint8_t percent)
     xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
 
     current_brightness_percent = percent > 100 ? 100 : percent;
+    rebuild_brightness_lut();
 
     /* Don't touch current_mode: if the rainbow is running, it picks up the
      * new brightness on its own on the next frame. Only push an update

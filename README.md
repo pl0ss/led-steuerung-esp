@@ -16,7 +16,10 @@ repo/
 
 # Hardware
 
-https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-Cores/dp/B0DHRV7784/
+- ESP32 Doppelpack, einer reicht: 12€
+  - https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-Cores/dp/B0DHRV7784/
+- LED Streifen: 5V WS2812B 1m 100 LEDs: 26€
+  - https://www.ledzone.de/products/ws2812b-led-strip-1?variant=43528649801995
 
 # First Installation
 
