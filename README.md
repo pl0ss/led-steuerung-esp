@@ -1,74 +1,197 @@
-# Struktur
+# LED Steuerung ESP 🌴✨🌈
 
+Eine App, mit der ein LED-Streifen per Bluetooth gesteuert werden kann. Die App sendet Befehle per BLE (Bluetooth Low Energy) an einen ESP32, der den LED-Streifen ansteuert.
+
+- Einzelne Farben setzen
+- Ganze Animationen abspielen z. B. Regenbogen 🌈
+- Betrieb per Powerbank möglich
+
+**Motivation:** Der LED-Streifen soll in eine Laterne eingebaut werden, für eine Laternenwanderung an der Uni. 🏮
+
+Du möchtest das Projekt nachbauen oder darauf aufbauen? Sehr gerne, siehe [Mitmachen](#mitmachen).
+
+## Inhalt
+
+- [Projektstruktur](#projektstruktur)
+- [Hardware](#hardware)
+- [Wichtige Befehle](#wichtige-befehle)
+- [Einrichtung der Entwicklungsumgebung](#einrichtung-der-entwicklungsumgebung)
+- [Verwendung der App](#verwendung-der-app)
+- [Mitmachen](#mitmachen)
+- [Erstinstallation (Doku zum Anlegen der Projekte)](#erstinstallation-doku-zum-anlegen-der-projekte)
+
+## Projektstruktur
+
+Die Struktur ist ein möglicher Entwurf und kann sich noch ändern.
+
+```
 repo/
+├── firmware/
+│   ├── esp32-common/        Logikbibliothek, reines C
+│   ├── esp32-ble/           Firmware-Target mit BLE-Trigger
+│   └── esp32-web-trigger/   PC/Host-Build mit HTTP-Trigger
+├── protocol/
+│   ├── ts/                  Gemeinsames TS-Package: Typen, Command Encoding/Decoding, UUIDs
+│   └── docs/                GATT-Service-Beschreibung, Command-Referenz
+├── apps/
+│   ├── react-ionic/
+│   ├── next-ionic/
+│   └── angular-ionic/
+├── makefile                 Kurzbefehle für die wichtigsten Aufgaben
+└── README.md                Diese Datei
+```
 
-- firmware/
-- - esp32-common/ (Logic Bibliothek, reines C)
-- - esp32-ble/ (Firmware Target mit BLE Trigger)
-- - esp32-web-trigger/ (PC/Host Build mit HTTP Trigger)
-- protocol/
-- - ts/ (gemeinsames TS Package: Typen, Command Encoding/Decoding, UUIDs)
-- - docs/ (GATT Service Beschreibung, Command Referenz)
-- apps/
-- - react-ionic/
-- - next-ionic/
-- - angular-ionic/
+## Hardware
 
-# Hardware
+- ESP32
+  - Doppelpack, einer reicht: [Amazon](https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-Cores/dp/B0DHRV7784/) 12 €
+- LED-Streifen
+  - 5V WS2812B, 1 m, 100 LEDs: [LEDZone](https://www.ledzone.de/products/ws2812b-led-strip-1?variant=43528649801995) 26 €
+- Stromversorgung: Netzteil oder Powerbank (5V)
 
-- ESP32 Doppelpack, einer reicht: 12€
-  - https://www.amazon.de/Entwicklungsplatine-QIQIAZI-ESP32-WROOM-32-Bluetooth-Dual-Cores/dp/B0DHRV7784/
-- LED Streifen: 5V WS2812B 1m 100 LEDs: 26€
-  - https://www.ledzone.de/products/ws2812b-led-strip-1?variant=43528649801995
+## Wichtige Befehle
 
-# First Installation
+Zum Bauen und Starten der Apps gibt es Kurzbefehle im `makefile`:
 
-## ESP IDF Example Projekt auswählen
+| Befehl     | Beschreibung                                      |
+| ---------- | ------------------------------------------------- |
+| `make aa`  | Angular-Ionic als Web-App starten (`ionic serve`) |
+| `make aai` | Angular-Ionic bauen und in Xcode öffnen           |
+| `make aaa` | Angular-Ionic bauen und in Android Studio öffnen  |
+| `make ar`  | React-Ionic als Web-App starten (`ionic serve`)   |
+| `make ari` | React-Ionic bauen und in Xcode öffnen             |
+| `make ara` | React-Ionic bauen und in Android Studio öffnen    |
 
-- VSC: ESP-IDF Extension
+## Einrichtung der Entwicklungsumgebung
 
-- Shift + CMD + P
-- ESP-IDF: New Project
-- ESP-IDF Examples -> bluetooth -> nimble -> blenroh
+### Voraussetzungen
 
-- Project Name: esp32-bleprph
-- Enter Project directory: .../led-steuerung-esp/firmware
+- Node.js und npm
+- Ionic CLI
+- Xcode (für iOS) bzw. Android Studio (für Android)
+- VS Code mit der Extension `ESP-IDF`
 
-### idf.py ausführen
+### Frontend
 
-- VS Code mit ESP-IDF-Extension
-- Strg+Shift+P und "ESP-IDF: Open ESP-IDF Terminal" ausführen
+Es besteht die Möglichkeit, die App in verschiedenen Frameworks umzusetzen. Das Nötigste, um den LED-Streifen anzusteuern, ist bereits in `angular-ionic` umgesetzt.
 
-## angular-ionic App
+#### Frontend: angular-ionic
 
-- VSC: WebNative Extension
-- Angular+lonic
-- Targets: Web, iOS, Android
-- Template: tabs
+1. Pakete installieren:
 
-- ionic serve
+   ```bash
+   cd apps/angular-ionic/ && npm install
+   ```
 
-- npm run build:ios
-- npm run build:android
-- npx cap open ios
-- npx cap open android
-- (siehe makefile)
+2. Am Desktop als Web-App öffnen:
 
-## react-ionic App
+   ```bash
+   ionic serve
+   ```
 
-- VSC: WebNative Extension
-- React+lonic
-- Targets: Web, iOS, Android
-- Template: tabs
+3. Projekt bauen und in Xcode öffnen:
 
-- ionic serve
+   ```bash
+   make aai
+   ```
 
-- npm run build:ios
-- npm run build:android
-- npx cap open ios
-- npx cap open android
-- (siehe makefile)
+4. Projekt bauen und in Android Studio öffnen:
 
-### Icons
+   ```bash
+   make aaa
+   ```
 
-- https://ionic.io/ionicons
+### Firmware (ESP32)
+
+Die Firmware wird mit dem ESP-IDF gebaut und geflasht.
+
+1. VS Code Extension `ESP-IDF` installieren
+2. ESP-IDF installieren (`v6.1.0`)
+
+#### Builden und Flashen
+
+In der unteren Leiste (BottomNav) von VS Code einstellen:
+
+- ESP-IDF-Version: `v6.1.0`
+- Flash-Methode: `UART`
+- Port: passenden Port auswählen
+- ESP-Modell: beim oben verlinkten ESP ist es `esp32`
+
+Danach:
+
+- Mit dem Schraubenschlüssel wird das Projekt gebaut.
+- Mit der Flamme wird das Projekt gebaut, geflasht und im Monitor geöffnet.
+
+Bei Bedarf kann der BLE-Gerätename im Code geändert werden:
+
+```c
+rc = ble_svc_gap_device_name_set("nimble-bleprph");
+```
+
+> Tipp: Wenn mehrere Geräte gleichzeitig im Einsatz sind (z. B. mehrere Laternen), vergib jedem Gerät einen eindeutigen Namen, damit sich die App mit dem richtigen ESP verbindet. Alternativ lassen sich die ESPs auch über ihre Device-ID unterscheiden, die in der App angezeigt wird.
+
+#### ESP anschließen
+
+Der GPIO-Pin für die Datenübertragung zum LED-Streifen ist `16`. Bei Bedarf kann er im Code geändert werden:
+
+```c
+#define LED_STRIP_GPIO_PIN 16
+```
+
+Der LED-Streifen braucht außerdem 5V und GND. Die Masse (GND) von ESP und LED-Streifen muss verbunden sein.
+
+#### `idf.py` ausführen, falls nötig
+
+1. VS Code mit ESP-IDF-Extension öffnen
+2. `Strg+Shift+P` (macOS: `Cmd+Shift+P`) und `ESP-IDF: Open ESP-IDF Terminal` ausführen
+
+## Verwendung der App
+
+- Bei mir funktionieren 100 LEDs bei 100 % Helligkeit sehr gut.
+- Nicht bei jeder Einstellung werden die Farben bei mir richtig dargestellt.
+
+## Mitmachen
+
+Du hast Lust, an diesem Projekt mitzuwirken oder es selbst auszuprobieren? Gerne!
+
+- Eigene Animationen ergänzen
+- Weitere Frontends (React, Next) ausbauen
+- Fehler melden oder Verbesserungen vorschlagen: Issues und Pull Requests sind willkommen :)
+
+## Erstinstallation (Doku zum Anlegen der Projekte)
+
+Mein Vorgehen beim Anlegen der Frameworks. **Das muss nicht ausgeführt werden!**
+
+### ESP-IDF-Beispielprojekt auswählen
+
+In VS Code mit der `ESP-IDF` Extension:
+
+1. `Shift+Cmd+P` (Windows/Linux: `Strg+Shift+P`)
+2. `ESP-IDF: New Project`
+3. `ESP-IDF Examples` → `bluetooth` → `nimble` → `bleprph`
+4. Project Name: `esp32-bleprph`
+5. Project Directory: `.../led-steuerung-esp/firmware`
+
+### Ionic-App anlegen (Angular oder React)
+
+In VS Code mit der `WebNative` Extension:
+
+1. Framework wählen: `Angular + Ionic` bzw. `React + Ionic`
+2. Targets: `Web`, `iOS`, `Android`
+3. Template: `tabs`
+
+Danach:
+
+```bash
+ionic serve
+npm run build:ios
+npm run build:android
+npx cap open ios
+npx cap open android
+```
+
+Die wichtigsten Befehle stehen auch im `makefile`.
+
+### Ionicons
+
+Icons für die App gibt es hier: https://ionic.io/ionicons
