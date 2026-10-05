@@ -154,6 +154,19 @@ static void handle_set_led_count(const cJSON *payload)
 }
 
 /*
+ * Starts the rainbow animation. Runs on the ESP32 itself until a
+ * "set_color" message (or a future effect) switches back to a solid
+ * color, independent of whether a phone stays connected:
+ *   { "type": "start_rainbow" }
+ */
+static void handle_start_rainbow(const cJSON *payload)
+{
+    (void)payload;
+    ESP_LOGI(TAG, "start_rainbow");
+    led_strip_ctrl_start_rainbow();
+}
+
+/*
  * TODO(led): message types for presets (e.g. "set_preset") go here once
  * presets exist. Intentionally not implemented yet.
  */
@@ -163,6 +176,7 @@ static const ble_msg_type_entry_t msg_handlers[] = {
     {"set_color", handle_set_color},
     {"set_brightness", handle_set_brightness},
     {"set_led_count", handle_set_led_count},
+    {"start_rainbow", handle_start_rainbow},
 };
 
 /* --- dispatch --------------------------------------------------------------- */

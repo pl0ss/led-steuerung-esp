@@ -87,6 +87,14 @@ static cJSON *handle_led_count(void)
     return data;
 }
 
+/* { "endpoint": "effect", "data": { "name": "solid" | "rainbow" } } */
+static cJSON *handle_effect(void)
+{
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddStringToObject(data, "name", led_strip_ctrl_get_effect_name());
+    return data;
+}
+
 /*
  * TODO(led): the "preset" endpoint goes here once presets exist. It
  * already exists below so the app-side router has something to call
@@ -104,6 +112,7 @@ static const ble_query_endpoint_t query_endpoints[] = {
     {"color", handle_color},
     {"brightness", handle_brightness},
     {"led_count", handle_led_count},
+    {"effect", handle_effect},
     {"preset", handle_not_implemented},
 };
 

@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BleService } from 'src/app/services/ble.service';
+import { IonButton } from '@ionic/angular';
 
 @Component({
   selector: 'app-color-picker',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, IonButton],
   template: `
     <div class="color-picker">
       <input
@@ -14,12 +15,9 @@ import { BleService } from 'src/app/services/ble.service';
         (change)="onColorChange()"
       />
 
-      <!-- <div class="presets">
-        <button (click)="setPreset('#ff0000')">Rot</button>
-        <button (click)="setPreset('#00ff00')">Grün</button>
-        <button (click)="setPreset('#0000ff')">Blau</button>
-        <button (click)="setPreset('#ffffff')">Weiß</button>
-      </div> -->
+      <div class="presets" style="margin-top: 10px;">
+        <ion-button (click)="startRainbow()">Regenbogen 🌈</ion-button>
+      </div>
     </div>
   `,
 })
@@ -38,6 +36,12 @@ export class ColorPickerComponent {
   async onColorChange(): Promise<void> {
     const { r, g, b } = this.hexToRgb(this.selectedColor);
     await this.bleService.sendCommand('set_color', { r, g, b });
+  }
+
+  // Läuft auf dem ESP32 weiter, bis eine neue Farbe (oder später eine andere
+  // Animation) gesendet wird, auch wenn die BLE-Verbindung währenddessen abbricht.
+  async startRainbow(): Promise<void> {
+    await this.bleService.sendCommand('start_rainbow');
   }
 
   // '#rrggbb' in einzelne 0..255 Kanäle zerlegen, passend zum { r, g, b } Payload des ESP32
