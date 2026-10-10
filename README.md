@@ -20,8 +20,8 @@ Du möchtest das Projekt nachbauen oder darauf aufbauen? Sehr gerne, siehe [Mitm
 - [Mitmachen](#mitmachen)
 - [Erstinstallation (Doku zum Anlegen der Projekte)](#erstinstallation-doku-zum-anlegen-der-projekte)
 
-<img height="450" alt="rainbow" src="https://github.com/user-attachments/assets/117b4cb0-a6bd-4e13-a4a9-6e05ddc3ce27" />
-<img height="450" alt="setup" src="https://github.com/user-attachments/assets/15ebe152-6b52-4172-a67b-3fc5cc172503" />
+<img height="400" alt="rainbow" src="https://github.com/user-attachments/assets/117b4cb0-a6bd-4e13-a4a9-6e05ddc3ce27" />
+<img height="400" alt="setup" src="https://github.com/user-attachments/assets/15ebe152-6b52-4172-a67b-3fc5cc172503" />
 
 ## Projektstruktur
 
@@ -154,8 +154,8 @@ ESP32 und LED-Streifen sind beide an die Masse des LED-Streifens angeschlossen. 
 3. Erst dann den ESP32 per USB-C-Kabel an eine Powerbank anschließen
 4. Zum Schluss das USB-A-Kabel an die Powerbank anschließen, das den LED-Streifen mit Strom versorgt
 
-<img height="450" alt="IMG_3787" src="https://github.com/user-attachments/assets/6c1b2a42-6638-45a2-98d0-859c16657ec0" />
-<img height="450" alt="IMG_3785" src="https://github.com/user-attachments/assets/237faa91-f1c6-401a-afa0-bb63841812f1" />
+<img height="400" alt="IMG_3787" src="https://github.com/user-attachments/assets/6c1b2a42-6638-45a2-98d0-859c16657ec0" />
+<img height="400" alt="IMG_3785" src="https://github.com/user-attachments/assets/237faa91-f1c6-401a-afa0-bb63841812f1" />
 
 #### `idf.py` ausführen, falls nötig
 
