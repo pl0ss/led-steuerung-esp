@@ -23,9 +23,6 @@ Du möchtest das Projekt nachbauen oder darauf aufbauen? Sehr gerne, siehe [Mitm
 <img height="450" alt="rainbow" src="https://github.com/user-attachments/assets/117b4cb0-a6bd-4e13-a4a9-6e05ddc3ce27" />
 <img height="450" alt="setup" src="https://github.com/user-attachments/assets/15ebe152-6b52-4172-a67b-3fc5cc172503" />
 
-
-
-
 ## Projektstruktur
 
 Die Struktur ist ein möglicher Entwurf und kann sich noch ändern.
@@ -146,9 +143,19 @@ Der GPIO-Pin für die Datenübertragung zum LED-Streifen ist `16`. Bei Bedarf ka
 
 Der LED-Streifen braucht außerdem 5V und GND. Die Masse (GND) von ESP und LED-Streifen muss verbunden sein.
 
+##### Verkabelung
+
+ESP32 und LED-Streifen sind beide an die Masse des LED-Streifens angeschlossen. Im Bild sind das die zwei weißen Kabel und das schwarze Kabel. Rot ist Plus, Grün ist die Datenleitung. Zum Verbinden habe ich Lötverbinder verwendet, die ich mit einem Heißluftföhn erhitzt habe.
+
+##### Reihenfolge beim Anschließen
+
+1. Zuerst die Kabel am ESP32 anstecken: Weiß ist Masse, Grün ist die Datenleitung
+2. Danach den Stecker des LED-Streifens an den LED-Streifen anschließen
+3. Erst dann den ESP32 per USB-C-Kabel an eine Powerbank anschließen
+4. Zum Schluss das USB-A-Kabel an die Powerbank anschließen, das den LED-Streifen mit Strom versorgt
+
 <img height="450" alt="IMG_3787" src="https://github.com/user-attachments/assets/6c1b2a42-6638-45a2-98d0-859c16657ec0" />
 <img height="450" alt="IMG_3785" src="https://github.com/user-attachments/assets/237faa91-f1c6-401a-afa0-bb63841812f1" />
-
 
 #### `idf.py` ausführen, falls nötig
 
