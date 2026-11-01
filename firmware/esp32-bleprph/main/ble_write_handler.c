@@ -26,6 +26,7 @@
 #include "ble_write_handler.h"
 #include "ble_protocol.h"
 #include "led_strip_ctrl.h"
+#include "led_animations.h"
 
 static const char *TAG = "ble_write_handler";
 
@@ -202,17 +203,44 @@ static void handle_set_power(const cJSON *payload)
     led_strip_ctrl_set_power(on);
 }
 
-/*
- * Starts the rainbow animation. Runs on the ESP32 itself until a
- * "set_color" message (or a future effect) switches back to a solid
- * color, independent of whether a phone stays connected:
- *   { "type": "start_rainbow" }
- */
-static void handle_start_rainbow(const cJSON *payload)
+/* Starts the animation with this name (an entry of led_animations[], the app
+ * gets the list from the "animations" query endpoint). Unknown names are only
+ * logged. */
+static void start_animation_by_name(const char *name)
 {
-    (void)payload;
-    ESP_LOGI(TAG, "start_rainbow");
-    led_strip_ctrl_start_rainbow();
+    int index = led_animations_find(name);
+    if (index < 0)
+    {
+        ESP_LOGW(TAG, "unknown animation \"%s\"", name);
+        return;
+    }
+
+    ESP_LOGI(TAG, "start_animation: %s", name);
+    led_strip_ctrl_start_animation((size_t)index);
+}
+
+/*
+ * Starts an animation. Runs on the ESP32 itself until a "set_color"
+ * message switches back to a solid color, independent of whether a phone
+ * stays connected:
+ *   { "type": "start_animation", "payload": { "name": "rainbow" } }
+ */
+static void handle_start_animation(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "start_animation message is missing a payload");
+        return;
+    }
+
+    const cJSON *name_json = cJSON_GetObjectItemCaseSensitive(payload, "name");
+    if (!cJSON_IsString(name_json) || name_json->valuestring == NULL)
+    {
+        ESP_LOGW(TAG, "start_animation payload needs a string \"name\" field");
+        return;
+    }
+
+    start_animation_by_name(name_json->valuestring);
 }
 
 /*
@@ -224,7 +252,8 @@ static void handle_start_rainbow(const cJSON *payload)
  *       "length": 150,          strip length, see set_strip_length
  *       "count": 120,           lit LEDs, see set_led_count
  *       "brightness": 80,       see set_brightness
- *       "effect": "solid",      "solid" (needs "r", "g", "b") or "rainbow"
+ *       "effect": "solid",      "solid" (needs "r", "g", "b") or the name of
+ *                               an animation (see start_animation)
  *       "r": 255, "g": 0, "b": 0,
  *       "power": true           see set_power
  *   } }
@@ -255,9 +284,9 @@ static void handle_sync(const cJSON *payload)
 
     const cJSON *effect_json = cJSON_GetObjectItemCaseSensitive(payload, "effect");
     if (cJSON_IsString(effect_json) && effect_json->valuestring != NULL &&
-        strcmp(effect_json->valuestring, "rainbow") == 0)
+        strcmp(effect_json->valuestring, "solid") != 0)
     {
-        handle_start_rainbow(payload);
+        start_animation_by_name(effect_json->valuestring);
     }
     else if (cJSON_HasObjectItem(payload, "r"))
     {
@@ -292,7 +321,7 @@ static const ble_msg_type_entry_t msg_handlers[] = {
     {"set_led_count", handle_set_led_count},
     {"set_strip_length", handle_set_strip_length},
     {"set_power", handle_set_power},
-    {"start_rainbow", handle_start_rainbow},
+    {"start_animation", handle_start_animation},
     {"sync", handle_sync},
 };
 

@@ -27,6 +27,7 @@
 #include "ble_read_handler.h"
 #include "ble_protocol.h"
 #include "led_strip_ctrl.h"
+#include "led_animations.h"
 
 static const char *TAG = "ble_read_handler";
 
@@ -107,7 +108,46 @@ static cJSON *handle_power(void)
     return data;
 }
 
-/* { "endpoint": "effect", "data": { "name": "solid" | "rainbow" } } */
+/* { "endpoint": "animations", "data": { "list": [ { "id": "rainbow", "label": "Regenbogen" }, ... ] } }
+ * Straight from led_animations[], so the app only offers what this firmware
+ * can actually play. */
+static cJSON *handle_animations(void)
+{
+    cJSON *data = cJSON_CreateObject();
+    cJSON *list = cJSON_AddArrayToObject(data, "list");
+
+    for (size_t i = 0; i < led_animation_count; i++)
+    {
+        cJSON *entry = cJSON_CreateObject();
+        cJSON_AddStringToObject(entry, "id", led_animations[i].name);
+        cJSON_AddStringToObject(entry, "label", led_animations[i].label);
+        cJSON_AddItemToArray(list, entry);
+    }
+    return data;
+}
+
+/* Everything the app shows, in one read. The app polls this, because the
+ * hardware buttons can change the state without the app knowing:
+ * { "endpoint": "state", "data": { "r", "g", "b", "brightness", "count",
+ *   "length", "power", "effect" } } */
+static cJSON *handle_state(void)
+{
+    uint8_t red, green, blue;
+    led_strip_ctrl_get_color(&red, &green, &blue);
+
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data, "r", red);
+    cJSON_AddNumberToObject(data, "g", green);
+    cJSON_AddNumberToObject(data, "b", blue);
+    cJSON_AddNumberToObject(data, "brightness", led_strip_ctrl_get_brightness());
+    cJSON_AddNumberToObject(data, "count", led_strip_ctrl_get_led_count());
+    cJSON_AddNumberToObject(data, "length", led_strip_ctrl_get_strip_length());
+    cJSON_AddBoolToObject(data, "power", led_strip_ctrl_get_power());
+    cJSON_AddStringToObject(data, "effect", led_strip_ctrl_get_effect_name());
+    return data;
+}
+
+/* { "endpoint": "effect", "data": { "name": "solid" | <animation name> } } */
 static cJSON *handle_effect(void)
 {
     cJSON *data = cJSON_CreateObject();
@@ -135,6 +175,8 @@ static const ble_query_endpoint_t query_endpoints[] = {
     {"strip_length", handle_strip_length},
     {"power", handle_power},
     {"effect", handle_effect},
+    {"animations", handle_animations},
+    {"state", handle_state},
     {"preset", handle_not_implemented},
 };
 

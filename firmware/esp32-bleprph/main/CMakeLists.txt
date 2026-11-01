@@ -8,7 +8,9 @@ idf_component_register(
         "ble_read_handler.c"
         "ble_write_handler.c"
         "led_strip_ctrl.c"
+        "led_animations.c"
+        "hw_buttons.c"
     INCLUDE_DIRS "."
-    PRIV_REQUIRES nvs_flash esp_timer bt console
+    PRIV_REQUIRES nvs_flash esp_timer bt console driver
     REQUIRES espressif__led_strip
 )

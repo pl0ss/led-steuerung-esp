@@ -13,6 +13,7 @@
 #define H_LED_STRIP_CTRL_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
 
@@ -53,7 +54,7 @@ extern "C"
     /* Sets how many LEDs (starting from index 0) should be lit, the rest is
      * turned off. Values above the strip length are clamped. Combined with
      * the current color and brightness, then pushed out immediately. Also
-     * applies while a running effect (e.g. the rainbow) is active, without
+     * applies while a running animation is active, without
      * interrupting it. */
     esp_err_t led_strip_ctrl_set_led_count(uint16_t count);
 
@@ -70,13 +71,15 @@ extern "C"
      * the strip is switched on. */
     esp_err_t led_strip_ctrl_set_power(bool on);
 
-    /* Starts an animated rainbow across the strip, running in its own
-     * FreeRTOS task on the ESP32. It keeps running by itself, independent of
-     * any BLE connection, until led_strip_ctrl_set_color() (or a future
-     * effect) switches back to a solid color. Brightness and active LED count
-     * still apply while it runs. Calling this again while it's already
-     * running is a no-op. */
-    esp_err_t led_strip_ctrl_start_rainbow(void);
+    /* Starts the animation led_animations[index] (see led_animations.h),
+     * running in its own FreeRTOS task on the ESP32. It keeps running by
+     * itself, independent of any BLE connection, until
+     * led_strip_ctrl_set_color() switches back to a solid color. Brightness
+     * and active LED count still apply while it runs. Starting another
+     * animation while one is running just switches over, calling it for the
+     * running one again is a no-op. Returns ESP_ERR_INVALID_ARG for an
+     * index outside the table. */
+    esp_err_t led_strip_ctrl_start_animation(size_t index);
 
     /* Reports the current state, so other code (e.g. the BLE query endpoints)
      * can answer without keeping its own copy. */
@@ -86,7 +89,8 @@ extern "C"
     uint16_t led_strip_ctrl_get_strip_length(void);
     bool led_strip_ctrl_get_power(void);
 
-    /* "solid" or "rainbow", for reporting the current effect over BLE. */
+    /* "solid" or the name of the running animation, for reporting the
+     * current effect over BLE. */
     const char *led_strip_ctrl_get_effect_name(void);
 
 #ifdef __cplusplus

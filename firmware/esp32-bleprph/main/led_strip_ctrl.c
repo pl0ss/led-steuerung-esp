@@ -10,6 +10,7 @@
 
 #include <math.h>
 #include "led_strip_ctrl.h"
+#include "led_animations.h"
 #include "led_strip.h"
 #include "led_strip_spi.h"
 #include "esp_log.h"
@@ -29,17 +30,15 @@ static const char *TAG = "led_strip_ctrl";
  * for LED/display brightness correction. */
 #define LED_STRIP_BRIGHTNESS_GAMMA 2.2
 
-/* How often the rainbow effect advances and redraws, in milliseconds. */
-#define LED_STRIP_RAINBOW_STEP_MS 20
-
-/* How often the rainbow task checks whether the strip was switched back on
- * while it is powered off (nothing is drawn in that time). */
-#define LED_STRIP_RAINBOW_IDLE_MS 100
+/* How often the animation task checks whether the strip was switched back on
+ * while it is powered off (nothing is drawn in that time). How fast frames
+ * advance while on is set per animation (step_ms in led_animations.c). */
+#define LED_STRIP_ANIMATION_IDLE_MS 100
 
 typedef enum
 {
     LED_MODE_SOLID,
-    LED_MODE_RAINBOW,
+    LED_MODE_ANIMATION,
 } led_mode_t;
 
 static led_strip_handle_t strip;
@@ -52,10 +51,14 @@ static SemaphoreHandle_t state_mutex;
 
 static led_mode_t current_mode = LED_MODE_SOLID;
 
-/* True while a rainbow task exists. Set and cleared under state_mutex, so a
- * quick "set_color -> start_rainbow" can never end up with two rainbow tasks
- * (the old one only notices the mode change on its next frame). */
-static bool rainbow_task_alive = false;
+/* Index into led_animations[] of the animation that plays (or played last).
+ * Only meaningful while current_mode is LED_MODE_ANIMATION. */
+static size_t current_animation = 0;
+
+/* True while an animation task exists. Set and cleared under state_mutex, so
+ * a quick "set_color -> start_animation" can never end up with two animation
+ * tasks (the old one only notices the mode change on its next frame). */
+static bool animation_task_alive = false;
 
 /* Master switch, see led_strip_ctrl_set_power(). */
 static bool current_power = true;
@@ -111,59 +114,8 @@ static uint8_t scale_channel(uint8_t value)
     return brightness_lut[value];
 }
 
-/* Standard integer HSV -> RGB conversion, h/s/v all 0..255. Used only by
- * the rainbow effect below. */
-static void hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v, uint8_t *r, uint8_t *g, uint8_t *b)
-{
-    if (s == 0)
-    {
-        *r = v;
-        *g = v;
-        *b = v;
-        return;
-    }
-
-    uint8_t region = h / 43;
-    uint8_t remainder = (h - (region * 43)) * 6;
-
-    uint8_t p = (uint8_t)(((uint16_t)v * (255 - s)) >> 8);
-    uint8_t q = (uint8_t)(((uint16_t)v * (255 - (((uint16_t)s * remainder) >> 8))) >> 8);
-    uint8_t t = (uint8_t)(((uint16_t)v * (255 - (((uint16_t)s * (255 - remainder)) >> 8))) >> 8);
-
-    switch (region)
-    {
-    case 0:
-        *r = v;
-        *g = t;
-        *b = p;
-        break;
-    case 1:
-        *r = q;
-        *g = v;
-        *b = p;
-        break;
-    case 2:
-        *r = p;
-        *g = v;
-        *b = t;
-        break;
-    case 3:
-        *r = p;
-        *g = q;
-        *b = v;
-        break;
-    case 4:
-        *r = t;
-        *g = p;
-        *b = v;
-        break;
-    default:
-        *r = v;
-        *g = p;
-        *b = q;
-        break;
-    }
-}
+/* (hsv_to_rgb() moved to led_animations.c together with the rainbow, it is
+ * only needed there.) */
 
 /* Recomputes every pixel from the current color/brightness/led_count and
  * pushes the result out. Called by every solid-color setter, so the strip
@@ -218,37 +170,39 @@ static esp_err_t apply_state(void)
 /* Runs entirely on its own: it only reads shared state (brightness,
  * led_count, mode) through state_mutex each frame, so it neither knows nor
  * cares whether a phone is currently connected over BLE. It keeps going
- * until something switches current_mode away from LED_MODE_RAINBOW (e.g.
- * led_strip_ctrl_set_color()), then deletes itself. */
-static void rainbow_task_fn(void *arg)
+ * until something switches current_mode away from LED_MODE_ANIMATION (e.g.
+ * led_strip_ctrl_set_color()), then deletes itself. Which animation it plays
+ * is read from current_animation every frame, so switching from one
+ * animation to another needs no new task. */
+static void animation_task_fn(void *arg)
 {
     (void)arg;
-    uint8_t offset = 0;
+    uint8_t frame = 0;
 
     for (;;)
     {
         xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
 
-        if (current_mode != LED_MODE_RAINBOW)
+        if (current_mode != LED_MODE_ANIMATION)
         {
-            rainbow_task_alive = false;
+            animation_task_alive = false;
             xSemaphoreGiveRecursive(state_mutex);
             break;
         }
 
         /* Powered off: led_strip_ctrl_set_power(false) already blanked the
          * strip, so there is nothing to draw. The task stays alive (instead
-         * of deleting itself) so the rainbow just continues once the strip
+         * of deleting itself) so the animation just continues once the strip
          * is switched back on. */
         if (!current_power)
         {
             xSemaphoreGiveRecursive(state_mutex);
-            vTaskDelay(pdMS_TO_TICKS(LED_STRIP_RAINBOW_IDLE_MS));
+            vTaskDelay(pdMS_TO_TICKS(LED_STRIP_ANIMATION_IDLE_MS));
             continue;
         }
 
+        const led_animation_t *animation = &led_animations[current_animation];
         uint16_t led_count = current_led_count;
-        uint16_t hue_span = led_count == 0 ? 1 : led_count;
 
         for (int i = 0; i < LED_STRIP_MAX_LEDS; i++)
         {
@@ -257,8 +211,7 @@ static void rainbow_task_fn(void *arg)
 
             if (lit)
             {
-                uint8_t hue = (uint8_t)(((i * 256 / hue_span) + offset) & 0xFF);
-                hsv_to_rgb(hue, 255, 255, &red, &green, &blue);
+                animation->pixel((uint16_t)i, led_count, frame, &red, &green, &blue);
                 red = scale_channel(red);
                 green = scale_channel(green);
                 blue = scale_channel(blue);
@@ -273,10 +226,11 @@ static void rainbow_task_fn(void *arg)
         }
 
         led_strip_refresh(strip);
+        uint16_t step_ms = animation->step_ms;
         xSemaphoreGiveRecursive(state_mutex);
 
-        offset++;
-        vTaskDelay(pdMS_TO_TICKS(LED_STRIP_RAINBOW_STEP_MS));
+        frame++;
+        vTaskDelay(pdMS_TO_TICKS(step_ms));
     }
 
     vTaskDelete(NULL);
@@ -334,7 +288,7 @@ esp_err_t led_strip_ctrl_set_color(uint8_t red, uint8_t green, uint8_t blue)
 {
     xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
 
-    /* A solid color always wins over a running effect. The rainbow task
+    /* A solid color always wins over a running effect. The animation task
      * notices current_mode changed the next time it takes state_mutex
      * (at most one frame later) and deletes itself; no explicit signal or
      * wait is needed since state_mutex already keeps their strip writes
@@ -356,7 +310,7 @@ esp_err_t led_strip_ctrl_set_brightness(uint8_t percent)
     current_brightness_percent = percent > 100 ? 100 : percent;
     rebuild_brightness_lut();
 
-    /* Don't touch current_mode: if the rainbow is running, it picks up the
+    /* Don't touch current_mode: if an animation is running, it picks up the
      * new brightness on its own on the next frame. Only push an update
      * ourselves for a static color, which has no task doing that. */
     esp_err_t err = ESP_OK;
@@ -400,7 +354,7 @@ esp_err_t led_strip_ctrl_set_strip_length(uint16_t length)
         current_led_count = current_strip_length;
     }
 
-    /* A running rainbow picks up the new length / LED count on its next
+    /* A running animation picks up the new length / LED count on its next
      * frame, same as for the other setters. */
     esp_err_t err = ESP_OK;
     if (current_mode == LED_MODE_SOLID)
@@ -418,8 +372,8 @@ esp_err_t led_strip_ctrl_set_power(bool on)
 
     current_power = on;
 
-    /* Solid color: nobody else redraws, so do it here. Rainbow: switching on
-     * is picked up by the (idle) rainbow task by itself, but switching off
+    /* Solid color: nobody else redraws, so do it here. Animation: switching on
+     * is picked up by the (idle) animation task by itself, but switching off
      * has to blank the strip right now, the task won't draw anymore. */
     esp_err_t err = ESP_OK;
     if (current_mode == LED_MODE_SOLID || !on)
@@ -431,13 +385,22 @@ esp_err_t led_strip_ctrl_set_power(bool on)
     return err;
 }
 
-esp_err_t led_strip_ctrl_start_rainbow(void)
+esp_err_t led_strip_ctrl_start_animation(size_t index)
 {
+    if (index >= led_animation_count)
+    {
+        ESP_LOGW(TAG, "no animation with index %u", (unsigned)index);
+        return ESP_ERR_INVALID_ARG;
+    }
+
     xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
 
-    current_mode = LED_MODE_RAINBOW;
-    bool must_create_task = !rainbow_task_alive;
-    rainbow_task_alive = true;
+    /* Switching from one animation to another only changes the index, the
+     * running task picks it up on its next frame. */
+    current_animation = index;
+    current_mode = LED_MODE_ANIMATION;
+    bool must_create_task = !animation_task_alive;
+    animation_task_alive = true;
 
     xSemaphoreGiveRecursive(state_mutex);
 
@@ -446,14 +409,14 @@ esp_err_t led_strip_ctrl_start_rainbow(void)
         return ESP_OK;
     }
 
-    BaseType_t ok = xTaskCreate(rainbow_task_fn, "led_rainbow", 4096, NULL,
+    BaseType_t ok = xTaskCreate(animation_task_fn, "led_animation", 4096, NULL,
                                 tskIDLE_PRIORITY + 1, NULL);
     if (ok != pdPASS)
     {
-        ESP_LOGE(TAG, "failed to create rainbow task");
+        ESP_LOGE(TAG, "failed to create animation task");
 
         xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
-        rainbow_task_alive = false;
+        animation_task_alive = false;
         current_mode = LED_MODE_SOLID;
         xSemaphoreGiveRecursive(state_mutex);
 
@@ -492,5 +455,5 @@ bool led_strip_ctrl_get_power(void)
 
 const char *led_strip_ctrl_get_effect_name(void)
 {
-    return current_mode == LED_MODE_RAINBOW ? "rainbow" : "solid";
+    return current_mode == LED_MODE_ANIMATION ? led_animations[current_animation].name : "solid";
 }

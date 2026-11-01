@@ -27,6 +27,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "bleprph.h"
 #include "led_strip_ctrl.h"
+#include "hw_buttons.h"
 
 #if CONFIG_EXAMPLE_EXTENDED_ADV
 static uint8_t ext_adv_pattern_1[] = {
@@ -621,6 +622,16 @@ void app_main(void)
     if (ret != ESP_OK)
     {
         ESP_LOGE(tag, "Failed to init LED strip: %s", esp_err_to_name(ret));
+    }
+    else
+    {
+        /* Hardware buttons to use the strip without the app, they need the
+         * strip to be initialised. */
+        ret = hw_buttons_init();
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(tag, "Failed to init hardware buttons: %s", esp_err_to_name(ret));
+        }
     }
 
     ret = nimble_port_init();
