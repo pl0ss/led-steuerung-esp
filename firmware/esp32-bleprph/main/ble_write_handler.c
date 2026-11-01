@@ -144,13 +144,62 @@ static void handle_set_led_count(const cJSON *payload)
     }
 
     long count;
-    if (!read_clamped_uint(payload, "count", LED_STRIP_LED_COUNT, &count))
+    if (!read_clamped_uint(payload, "count", LED_STRIP_MAX_LEDS, &count))
     {
         return;
     }
 
     ESP_LOGI(TAG, "set_led_count: %ld", count);
     led_strip_ctrl_set_led_count((uint16_t)count);
+}
+
+/*
+ * Tells the ESP32 how many LEDs the connected strip really has. This is the
+ * upper bound for "set_led_count". Anything above LED_STRIP_MAX_LEDS is
+ * clamped, LEDs behind the strip length stay dark:
+ *   { "type": "set_strip_length", "payload": { "length": 150 } }
+ */
+static void handle_set_strip_length(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "set_strip_length message is missing a payload");
+        return;
+    }
+
+    long length;
+    if (!read_clamped_uint(payload, "length", LED_STRIP_MAX_LEDS, &length))
+    {
+        return;
+    }
+
+    ESP_LOGI(TAG, "set_strip_length: %ld", length);
+    led_strip_ctrl_set_strip_length((uint16_t)length);
+}
+
+/*
+ * Master switch. Off blanks the strip, on shows it again exactly as before
+ * (same color or same running effect):
+ *   { "type": "set_power", "payload": { "on": false } }
+ */
+static void handle_set_power(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "set_power message is missing a payload");
+        return;
+    }
+
+    const cJSON *on_json = cJSON_GetObjectItemCaseSensitive(payload, "on");
+    if (!cJSON_IsBool(on_json))
+    {
+        ESP_LOGW(TAG, "set_power payload needs a boolean \"on\" field");
+        return;
+    }
+
+    bool on = cJSON_IsTrue(on_json);
+    ESP_LOGI(TAG, "set_power: %s", on ? "on" : "off");
+    led_strip_ctrl_set_power(on);
 }
 
 /*
@@ -167,6 +216,71 @@ static void handle_start_rainbow(const cJSON *payload)
 }
 
 /*
+ * First message the app sends after connecting: restores the whole state in
+ * one go (the app remembers it per ESP32). Reuses the payload fields of the
+ * individual messages above, every field is optional, only the ones present
+ * are applied:
+ *   { "type": "sync", "payload": {
+ *       "length": 150,          strip length, see set_strip_length
+ *       "count": 120,           lit LEDs, see set_led_count
+ *       "brightness": 80,       see set_brightness
+ *       "effect": "solid",      "solid" (needs "r", "g", "b") or "rainbow"
+ *       "r": 255, "g": 0, "b": 0,
+ *       "power": true           see set_power
+ *   } }
+ * The order below matters: the strip length has to be known before the LED
+ * count is clamped against it, and power comes last so a strip that is
+ * supposed to be off never flashes up.
+ */
+static void handle_sync(const cJSON *payload)
+{
+    if (payload == NULL)
+    {
+        ESP_LOGW(TAG, "sync message is missing a payload");
+        return;
+    }
+
+    if (cJSON_HasObjectItem(payload, "length"))
+    {
+        handle_set_strip_length(payload);
+    }
+    if (cJSON_HasObjectItem(payload, "count"))
+    {
+        handle_set_led_count(payload);
+    }
+    if (cJSON_HasObjectItem(payload, "brightness"))
+    {
+        handle_set_brightness(payload);
+    }
+
+    const cJSON *effect_json = cJSON_GetObjectItemCaseSensitive(payload, "effect");
+    if (cJSON_IsString(effect_json) && effect_json->valuestring != NULL &&
+        strcmp(effect_json->valuestring, "rainbow") == 0)
+    {
+        handle_start_rainbow(payload);
+    }
+    else if (cJSON_HasObjectItem(payload, "r"))
+    {
+        handle_set_color(payload);
+    }
+
+    if (cJSON_HasObjectItem(payload, "power"))
+    {
+        /* handle_set_power() expects "on", sync calls the field "power" */
+        const cJSON *power_json = cJSON_GetObjectItemCaseSensitive(payload, "power");
+        if (cJSON_IsBool(power_json))
+        {
+            ESP_LOGI(TAG, "sync power: %s", cJSON_IsTrue(power_json) ? "on" : "off");
+            led_strip_ctrl_set_power(cJSON_IsTrue(power_json));
+        }
+        else
+        {
+            ESP_LOGW(TAG, "sync \"power\" field needs to be a boolean");
+        }
+    }
+}
+
+/*
  * TODO(led): message types for presets (e.g. "set_preset") go here once
  * presets exist. Intentionally not implemented yet.
  */
@@ -176,7 +290,10 @@ static const ble_msg_type_entry_t msg_handlers[] = {
     {"set_color", handle_set_color},
     {"set_brightness", handle_set_brightness},
     {"set_led_count", handle_set_led_count},
+    {"set_strip_length", handle_set_strip_length},
+    {"set_power", handle_set_power},
     {"start_rainbow", handle_start_rainbow},
+    {"sync", handle_sync},
 };
 
 /* --- dispatch --------------------------------------------------------------- */

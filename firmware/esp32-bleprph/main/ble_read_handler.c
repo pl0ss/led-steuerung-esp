@@ -78,12 +78,32 @@ static cJSON *handle_brightness(void)
     return data;
 }
 
-/* { "endpoint": "led_count", "data": { "count": ..., "max": ... } } */
+/* { "endpoint": "led_count", "data": { "count": ..., "max": ... } }
+ * "max" is the strip length the app configured, not the firmware limit. */
 static cJSON *handle_led_count(void)
 {
     cJSON *data = cJSON_CreateObject();
     cJSON_AddNumberToObject(data, "count", led_strip_ctrl_get_led_count());
-    cJSON_AddNumberToObject(data, "max", LED_STRIP_LED_COUNT);
+    cJSON_AddNumberToObject(data, "max", led_strip_ctrl_get_strip_length());
+    return data;
+}
+
+/* { "endpoint": "strip_length", "data": { "length": ..., "limit": ... } }
+ * "limit" is the firmware limit (LED_STRIP_MAX_LEDS), so the app can see
+ * whether a requested length was clamped. */
+static cJSON *handle_strip_length(void)
+{
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data, "length", led_strip_ctrl_get_strip_length());
+    cJSON_AddNumberToObject(data, "limit", LED_STRIP_MAX_LEDS);
+    return data;
+}
+
+/* { "endpoint": "power", "data": { "on": true | false } } */
+static cJSON *handle_power(void)
+{
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddBoolToObject(data, "on", led_strip_ctrl_get_power());
     return data;
 }
 
@@ -112,6 +132,8 @@ static const ble_query_endpoint_t query_endpoints[] = {
     {"color", handle_color},
     {"brightness", handle_brightness},
     {"led_count", handle_led_count},
+    {"strip_length", handle_strip_length},
+    {"power", handle_power},
     {"effect", handle_effect},
     {"preset", handle_not_implemented},
 };

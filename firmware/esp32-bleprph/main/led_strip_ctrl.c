@@ -32,6 +32,10 @@ static const char *TAG = "led_strip_ctrl";
 /* How often the rainbow effect advances and redraws, in milliseconds. */
 #define LED_STRIP_RAINBOW_STEP_MS 20
 
+/* How often the rainbow task checks whether the strip was switched back on
+ * while it is powered off (nothing is drawn in that time). */
+#define LED_STRIP_RAINBOW_IDLE_MS 100
+
 typedef enum
 {
     LED_MODE_SOLID,
@@ -48,6 +52,14 @@ static SemaphoreHandle_t state_mutex;
 
 static led_mode_t current_mode = LED_MODE_SOLID;
 
+/* True while a rainbow task exists. Set and cleared under state_mutex, so a
+ * quick "set_color -> start_rainbow" can never end up with two rainbow tasks
+ * (the old one only notices the mode change on its next frame). */
+static bool rainbow_task_alive = false;
+
+/* Master switch, see led_strip_ctrl_set_power(). */
+static bool current_power = true;
+
 /* Base color, independent of brightness and active LED count. */
 static uint8_t current_red;
 static uint8_t current_green;
@@ -56,9 +68,13 @@ static uint8_t current_blue;
 /* 0..100, applied as a scale factor on top of the base color. */
 static uint8_t current_brightness_percent = 100;
 
+/* How many LEDs the physical strip has. Comes from the app after connecting,
+ * until then a default is assumed. Never above LED_STRIP_MAX_LEDS. */
+static uint16_t current_strip_length = LED_STRIP_DEFAULT_LED_COUNT;
+
 /* How many LEDs (from index 0) are lit, the rest stays off. Defaults to
- * the whole strip. */
-static uint16_t current_led_count = LED_STRIP_LED_COUNT;
+ * the whole strip. Never above current_strip_length. */
+static uint16_t current_led_count = LED_STRIP_DEFAULT_LED_COUNT;
 
 /* Maps a channel value (0..255) to its brightness-scaled value for the
  * current brightness. Rebuilt only when the brightness changes, so the
@@ -169,12 +185,17 @@ static esp_err_t apply_state(void)
      * monitor output when the strip shows something unexpected: if these
      * values are right but the strip is wrong, the problem is on the way
      * to the strip (signal level, ground, power), not in this code. */
-    ESP_LOGI(TAG, "apply: r=%u g=%u b=%u (scaled) leds=%u brightness=%u%%",
-             red, green, blue, current_led_count, current_brightness_percent);
+    ESP_LOGI(TAG, "apply: r=%u g=%u b=%u (scaled) leds=%u brightness=%u%% power=%d",
+             red, green, blue, current_led_count, current_brightness_percent,
+             current_power);
 
-    for (int i = 0; i < LED_STRIP_LED_COUNT; i++)
+    /* Always writes the whole buffer (not just the strip length): that way
+     * LEDs that were lit before the strip length / LED count was reduced get
+     * switched off again, and so does a physical strip that is longer than
+     * the length the app told us about. */
+    for (int i = 0; i < LED_STRIP_MAX_LEDS; i++)
     {
-        bool lit = (uint16_t)i < current_led_count;
+        bool lit = current_power && (uint16_t)i < current_led_count;
 
         /* Plain (r, g, b) — led_model=LED_MODEL_WS2812 combined with
          * color_component_format=LED_STRIP_COLOR_COMPONENT_FMT_GRB already
@@ -210,14 +231,26 @@ static void rainbow_task_fn(void *arg)
 
         if (current_mode != LED_MODE_RAINBOW)
         {
+            rainbow_task_alive = false;
             xSemaphoreGiveRecursive(state_mutex);
             break;
+        }
+
+        /* Powered off: led_strip_ctrl_set_power(false) already blanked the
+         * strip, so there is nothing to draw. The task stays alive (instead
+         * of deleting itself) so the rainbow just continues once the strip
+         * is switched back on. */
+        if (!current_power)
+        {
+            xSemaphoreGiveRecursive(state_mutex);
+            vTaskDelay(pdMS_TO_TICKS(LED_STRIP_RAINBOW_IDLE_MS));
+            continue;
         }
 
         uint16_t led_count = current_led_count;
         uint16_t hue_span = led_count == 0 ? 1 : led_count;
 
-        for (int i = 0; i < LED_STRIP_LED_COUNT; i++)
+        for (int i = 0; i < LED_STRIP_MAX_LEDS; i++)
         {
             bool lit = (uint16_t)i < led_count;
             uint8_t red = 0, green = 0, blue = 0;
@@ -262,7 +295,7 @@ esp_err_t led_strip_ctrl_init(void)
 
     led_strip_config_t strip_config = {
         .strip_gpio_num = LED_STRIP_GPIO_PIN,
-        .max_leds = LED_STRIP_LED_COUNT,
+        .max_leds = LED_STRIP_MAX_LEDS,
         .led_model = LED_MODEL_WS2812,
         .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB,
         .flags = {
@@ -340,10 +373,56 @@ esp_err_t led_strip_ctrl_set_led_count(uint16_t count)
 {
     xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
 
-    current_led_count = count > LED_STRIP_LED_COUNT ? LED_STRIP_LED_COUNT : count;
+    current_led_count = count > current_strip_length ? current_strip_length : count;
 
     esp_err_t err = ESP_OK;
     if (current_mode == LED_MODE_SOLID)
+    {
+        err = apply_state();
+    }
+
+    xSemaphoreGiveRecursive(state_mutex);
+    return err;
+}
+
+esp_err_t led_strip_ctrl_set_strip_length(uint16_t length)
+{
+    xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
+
+    if (length < 1)
+    {
+        length = 1;
+    }
+    current_strip_length = length > LED_STRIP_MAX_LEDS ? LED_STRIP_MAX_LEDS : length;
+
+    if (current_led_count > current_strip_length)
+    {
+        current_led_count = current_strip_length;
+    }
+
+    /* A running rainbow picks up the new length / LED count on its next
+     * frame, same as for the other setters. */
+    esp_err_t err = ESP_OK;
+    if (current_mode == LED_MODE_SOLID)
+    {
+        err = apply_state();
+    }
+
+    xSemaphoreGiveRecursive(state_mutex);
+    return err;
+}
+
+esp_err_t led_strip_ctrl_set_power(bool on)
+{
+    xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
+
+    current_power = on;
+
+    /* Solid color: nobody else redraws, so do it here. Rainbow: switching on
+     * is picked up by the (idle) rainbow task by itself, but switching off
+     * has to blank the strip right now, the task won't draw anymore. */
+    esp_err_t err = ESP_OK;
+    if (current_mode == LED_MODE_SOLID || !on)
     {
         err = apply_state();
     }
@@ -356,12 +435,13 @@ esp_err_t led_strip_ctrl_start_rainbow(void)
 {
     xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
 
-    bool already_running = (current_mode == LED_MODE_RAINBOW);
     current_mode = LED_MODE_RAINBOW;
+    bool must_create_task = !rainbow_task_alive;
+    rainbow_task_alive = true;
 
     xSemaphoreGiveRecursive(state_mutex);
 
-    if (already_running)
+    if (!must_create_task)
     {
         return ESP_OK;
     }
@@ -371,6 +451,12 @@ esp_err_t led_strip_ctrl_start_rainbow(void)
     if (ok != pdPASS)
     {
         ESP_LOGE(TAG, "failed to create rainbow task");
+
+        xSemaphoreTakeRecursive(state_mutex, portMAX_DELAY);
+        rainbow_task_alive = false;
+        current_mode = LED_MODE_SOLID;
+        xSemaphoreGiveRecursive(state_mutex);
+
         return ESP_ERR_NO_MEM;
     }
 
@@ -392,6 +478,16 @@ uint8_t led_strip_ctrl_get_brightness(void)
 uint16_t led_strip_ctrl_get_led_count(void)
 {
     return current_led_count;
+}
+
+uint16_t led_strip_ctrl_get_strip_length(void)
+{
+    return current_strip_length;
+}
+
+bool led_strip_ctrl_get_power(void)
+{
+    return current_power;
 }
 
 const char *led_strip_ctrl_get_effect_name(void)
