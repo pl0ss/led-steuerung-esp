@@ -3,7 +3,33 @@ import { Preferences } from '@capacitor/preferences';
 import { distinctUntilChanged, map } from 'rxjs';
 import { BleService } from 'src/app/services/ble.service';
 
-export type LedEffect = 'solid' | 'rainbow';
+// 'solid' oder die id einer Animation, die der ESP32 meldet (Endpoint "animations")
+export type LedEffect = string;
+
+export interface LedAnimation {
+  id: string;
+  label: string;
+}
+
+// Wie oft der ESP32 nach seinem Zustand gefragt wird. Nötig, weil die Hardware Buttons am ESP32
+// den Zustand ändern können, ohne dass die App davon etwas mitbekommt.
+const STATE_POLL_INTERVAL_MS = 3000;
+
+// Nach einem eigenen Kommando die Antwort des nächsten Polls ignorieren, sie könnte noch den
+// Stand von vor dem Kommando enthalten und die UI kurz zurückspringen lassen.
+const STATE_POLL_QUIET_MS = 1500;
+
+// Antwort des ESP32 auf den Endpoint "state"
+interface EspState {
+  r: number;
+  g: number;
+  b: number;
+  brightness: number;
+  count: number;
+  length: number;
+  power: boolean;
+  effect: string;
+}
 
 // Harte Obergrenze der Firmware, muss zu LED_STRIP_MAX_LEDS in led_strip_ctrl.h passen
 export const LED_STRIP_MAX_LEDS = 300;
@@ -44,6 +70,9 @@ export class LedStateService {
   public readonly effect = signal<LedEffect>('solid');
   public readonly powered = signal(true);
 
+  // Alle Animationen, die der ESP32 kann (so funktioniert jede App mit jedem ESP32)
+  public readonly animations = signal<LedAnimation[]>([]);
+
   public readonly pickerColor = computed(() =>
     this.powered() && this.effect() === 'solid'
       ? this.color()
@@ -51,6 +80,9 @@ export class LedStateService {
   );
 
   private deviceId: string | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private polling = false;
+  private lastCommandAt = 0;
 
   constructor() {
     this.bleService.currentDevice$
@@ -62,7 +94,9 @@ export class LedStateService {
         if (deviceId) {
           void this.onConnected(deviceId);
         } else {
+          this.stopPolling();
           this.deviceId = null;
+          this.animations.set([]);
         }
       });
   }
@@ -84,16 +118,16 @@ export class LedStateService {
     }
   }
 
-  // Läuft auf dem ESP32 weiter, bis eine neue Farbe (oder später eine andere
-  // Animation) gesendet wird, auch wenn die BLE-Verbindung währenddessen abbricht.
-  public async startRainbow(): Promise<void> {
+  // Läuft auf dem ESP32 weiter, bis eine neue Farbe oder eine andere Animation
+  // gesendet wird, auch wenn die BLE-Verbindung währenddessen abbricht.
+  public async startAnimation(id: string): Promise<void> {
     const wasOff = !this.powered();
 
-    this.effect.set('rainbow');
+    this.effect.set(id);
     this.powered.set(true);
     await this.persist();
 
-    await this.send('start_rainbow');
+    await this.send('start_animation', { name: id });
     if (wasOff) {
       await this.send('set_power', { on: true });
     }
@@ -122,16 +156,11 @@ export class LedStateService {
    * leuchtet er danach weiter komplett, sonst wird die Anzahl höchstens gekürzt.
    */
   public async setStripLength(length: number): Promise<void> {
-    const newLength = Math.min(
-      Math.max(Math.round(length), 1),
-      LED_STRIP_MAX_LEDS,
-    );
+    const newLength = Math.min(Math.max(Math.round(length), 1), LED_STRIP_MAX_LEDS);
     const allWereLit = this.ledCount() >= this.stripLength();
 
     this.stripLength.set(newLength);
-    this.ledCount.set(
-      allWereLit ? newLength : Math.min(this.ledCount(), newLength),
-    );
+    this.ledCount.set(allWereLit ? newLength : Math.min(this.ledCount(), newLength));
     await this.persist();
 
     await this.send('sync', {
@@ -178,16 +207,101 @@ export class LedStateService {
     };
     if (stored) {
       payload['brightness'] = this.brightness();
-      if (this.effect() === 'rainbow') {
-        payload['effect'] = 'rainbow';
-      } else {
-        payload['effect'] = 'solid';
+      payload['effect'] = this.effect();
+      if (this.effect() === 'solid') {
         Object.assign(payload, this.hexToRgb(this.color()));
       }
       payload['power'] = this.powered();
     }
 
     await this.send('sync', payload);
+    if (this.deviceId !== deviceId) return;
+
+    await this.loadAnimations();
+    if (this.deviceId !== deviceId) return;
+
+    this.startPolling();
+  }
+
+  //* Zustand vom ESP32 holen
+
+  // Die Liste der Animationen kommt vom ESP32, die App kennt keine eigenen
+  private async loadAnimations(): Promise<void> {
+    try {
+      const response = await this.bleService.queryEndpoint<{
+        list: LedAnimation[];
+      }>('animations');
+      this.animations.set(Array.isArray(response.list) ? response.list : []);
+    } catch (error) {
+      console.error('Animationen vom ESP laden fehlgeschlagen', error);
+    }
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+    this.pollTimer = setInterval(() => void this.pollState(), STATE_POLL_INTERVAL_MS);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  /**
+   * Übernimmt den Zustand des ESP32 (z.B. nach einem Tastendruck am Gerät) in die App und
+   * speichert ihn, damit beim nächsten Verbindungsaufbau nicht der alte Stand zurückgeschickt wird.
+   */
+  private async pollState(): Promise<void> {
+    const deviceId = this.deviceId;
+    if (!deviceId || this.polling) return;
+    if (Date.now() - this.lastCommandAt < STATE_POLL_QUIET_MS) return;
+
+    this.polling = true;
+    try {
+      const state = await this.bleService.queryEndpoint<EspState>('state');
+
+      // Währenddessen getrennt oder ein eigenes Kommando abgeschickt: Antwort ist veraltet
+      if (this.deviceId !== deviceId) return;
+      if (Date.now() - this.lastCommandAt < STATE_POLL_QUIET_MS) return;
+
+      this.adopt(state);
+    } catch (error) {
+      console.error('ESP Zustand abfragen fehlgeschlagen', error);
+    } finally {
+      this.polling = false;
+    }
+  }
+
+  private adopt(state: EspState): void {
+    const hex =
+      '#' +
+      [state.r, state.g, state.b]
+        .map((channel) => this.clampInt(channel, 0, 255, 0).toString(16).padStart(2, '0'))
+        .join('');
+    const stripLength = this.clampInt(state.length, 1, LED_STRIP_MAX_LEDS, this.stripLength());
+    const ledCount = this.clampInt(state.count, 0, stripLength, this.ledCount());
+    const brightness = this.clampInt(state.brightness, 0, 100, this.brightness());
+    const effect = this.isValidEffect(state.effect) ? state.effect : this.effect();
+    const powered = typeof state.power === 'boolean' ? state.power : this.powered();
+
+    const changed =
+      hex !== this.color() ||
+      stripLength !== this.stripLength() ||
+      ledCount !== this.ledCount() ||
+      brightness !== this.brightness() ||
+      effect !== this.effect() ||
+      powered !== this.powered();
+    if (!changed) return;
+
+    this.color.set(hex);
+    this.stripLength.set(stripLength);
+    this.ledCount.set(ledCount);
+    this.brightness.set(brightness);
+    this.effect.set(effect);
+    this.powered.set(powered);
+    void this.persist();
   }
 
   //* Speicher
@@ -236,7 +350,7 @@ export class LedStateService {
         color: /^#[0-9a-f]{6}$/i.test(parsed.color ?? '')
           ? (parsed.color as string)
           : COLOR_PICKER_NEUTRAL,
-        effect: parsed.effect === 'rainbow' ? 'rainbow' : 'solid',
+        effect: this.isValidEffect(parsed.effect) ? parsed.effect : 'solid',
         powered: parsed.powered !== false,
       };
     } catch (error) {
@@ -250,11 +364,17 @@ export class LedStateService {
   // Ein Fehler beim Senden (z.B. Verbindung weg) soll die UI nicht kaputt machen, der
   // Zustand ist gespeichert und wird beim nächsten Verbindungsaufbau per "sync" nachgereicht
   private async send(type: string, payload?: unknown): Promise<void> {
+    this.lastCommandAt = Date.now();
     try {
       await this.bleService.sendCommand(type, payload);
     } catch (error) {
       console.error(`BLE Kommando "${type}" fehlgeschlagen`, error);
     }
+  }
+
+  // 'solid' oder eine Animations-id, wie sie der ESP32 vergibt (kurz, nur a-z, 0-9 und _)
+  private isValidEffect(value: unknown): value is string {
+    return typeof value === 'string' && /^[a-z0-9_]{1,32}$/.test(value);
   }
 
   private clampInt(

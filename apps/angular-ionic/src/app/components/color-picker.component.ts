@@ -17,8 +17,15 @@ import { IonButton } from '@ionic/angular';
         (change)="onColorChange($any($event.target).value)"
       />
 
+      <!-- Nur die Animationen, die der ESP32 selbst meldet. Die aktive ist gefüllt. -->
       <div class="presets" style="margin-top: 10px;">
-        <ion-button (click)="startRainbow()">Regenbogen 🌈</ion-button>
+        @for (animation of ledState.animations(); track animation.id) {
+          <ion-button
+            [fill]="isActive(animation.id) ? 'solid' : 'outline'"
+            (click)="startAnimation(animation.id)"
+            >{{ animation.label }}</ion-button
+          >
+        }
       </div>
     </div>
   `,
@@ -38,8 +45,12 @@ export class ColorPickerComponent {
 
   // Läuft auf dem ESP32 weiter, bis eine neue Farbe (oder später eine andere
   // Animation) gesendet wird, auch wenn die BLE-Verbindung währenddessen abbricht.
-  async startRainbow(): Promise<void> {
-    await this.ledState.startRainbow();
+  async startAnimation(id: string): Promise<void> {
+    await this.ledState.startAnimation(id);
+  }
+
+  isActive(id: string): boolean {
+    return this.ledState.powered() && this.ledState.effect() === id;
   }
 
   // hexToRgb (und damit das Senden an den ESP32) liegt jetzt im LedStateService
