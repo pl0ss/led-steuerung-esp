@@ -17,6 +17,7 @@ Du möchtest das Projekt nachbauen oder darauf aufbauen? Sehr gerne, siehe [Mitm
 - [Wichtige Befehle](#wichtige-befehle)
 - [Einrichtung der Entwicklungsumgebung](#einrichtung-der-entwicklungsumgebung)
 - [Verwendung der App](#verwendung-der-app)
+- [Bedienung ohne App](#bedienung-ohne-app)
 - [Mitmachen](#mitmachen)
 - [Erstinstallation (Doku zum Anlegen der Projekte)](#erstinstallation-doku-zum-anlegen-der-projekte)
 
@@ -167,11 +168,26 @@ ESP32 und LED-Streifen sind beide an die Masse des LED-Streifens angeschlossen. 
 - Bei mir funktionieren 100 LEDs bei 100 % Helligkeit sehr gut.
 - Nicht bei jeder Einstellung werden die Farben bei mir richtig dargestellt.
 
+## Bedienung ohne App
+
+Der LED-Streifen lässt sich auch ohne Handy mit der Taste `BOOT` auf dem ESP32 bedienen. Die Taste `EN` daneben startet den ESP nur neu und hat keine weitere Funktion.
+
+| Bedienung                               | Wirkung                        |
+| --------------------------------------- | ------------------------------ |
+| Kurz drücken                            | Nächste Farbe oder Animation   |
+| Lange drücken (etwa eine halbe Sekunde) | Vorherige Farbe oder Animation |
+
+Die Reihenfolge ist: Orange, Lila, Gelb, Blau, Grün, Rot, Aus, danach alle Animationen (z. B. Regenbogen, Kerze). Am Ende der Liste geht es wieder von vorne los. Nach dem Einschalten startet der Streifen bei "Aus", ein kurzer Druck zeigt also die erste Animation und ein langer Druck Rot.
+
+- Die blaue LED `D2` auf dem ESP leuchtet, solange ein Handy verbunden ist.
+- Ist gleichzeitig ein Handy verbunden, übernimmt die App die Änderung nach wenigen Sekunden.
+- Die Helligkeit lässt sich nur in der App ändern.
+
 ## Mitmachen
 
 Du hast Lust, an diesem Projekt mitzuwirken oder es selbst auszuprobieren? Gerne!
 
-- Eigene Animationen ergänzen
+- Eigene Animationen ergänzen (eine Funktion und ein Eintrag in `led_animations.c`, die App und die Taste am ESP zeigen sie automatisch an)
 - Weitere Frontends (React, Next) ausbauen
 - Fehler melden oder Verbesserungen vorschlagen: Issues und Pull Requests sind willkommen :)
 
