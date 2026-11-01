@@ -10,6 +10,7 @@ idf_component_register(
         "led_strip_ctrl.c"
         "led_animations.c"
         "hw_buttons.c"
+        "status_led.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES nvs_flash esp_timer bt console driver
     REQUIRES espressif__led_strip

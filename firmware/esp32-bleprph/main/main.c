@@ -28,6 +28,7 @@
 #include "bleprph.h"
 #include "led_strip_ctrl.h"
 #include "hw_buttons.h"
+#include "status_led.h"
 
 #if CONFIG_EXAMPLE_EXTENDED_ADV
 static uint8_t ext_adv_pattern_1[] = {
@@ -292,6 +293,9 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
         }
         MODLOG_DFLT(INFO, "\n");
 
+        /* LED on while a phone is connected */
+        status_led_set(event->connect.status == 0);
+
         if (event->connect.status != 0)
         {
             /* Connection failed; resume advertising. */
@@ -311,6 +315,8 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg)
         MODLOG_DFLT(INFO, "disconnect; reason=%d ", event->disconnect.reason);
         bleprph_print_conn_desc(&event->disconnect.conn);
         MODLOG_DFLT(INFO, "\n");
+
+        status_led_set(false);
 
         /* Connection terminated; resume advertising. */
 #if CONFIG_EXAMPLE_EXTENDED_ADV
@@ -615,6 +621,13 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    /* Connection LED (D2 on the board), off until a phone connects. */
+    ret = status_led_init();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(tag, "Failed to init status LED: %s", esp_err_to_name(ret));
+    }
 
     /* Initialize the LED strip before BLE comes up, so a command arriving
      * right after connect can already be applied. */
