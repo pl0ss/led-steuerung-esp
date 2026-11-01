@@ -33,9 +33,7 @@
           <p style="margin: 5px">UUIDs: {{device.device.uuids}}</p>
           <p style="margin: 5px">RSSI: {{device.rssi}}</p>
 
-          <ion-button (click)="bleService.connectToBleDevice(device)"
-            >Verbinden</ion-button
-          >
+          <ion-button (click)="bleService.connectToBleDevice(device)">Verbinden</ion-button>
         </div>
         }
       </div>
@@ -53,36 +51,31 @@
 
       <div class="divList">
         <div class="border-radius">
-          <ion-button (click)="bleService.disconnectFromBleDevice()"
-            >Verbindung trennen</ion-button
-          >
+          <ion-button (click)="bleService.disconnectFromBleDevice()">Verbindung trennen</ion-button>
+
+          <ion-button (click)="ledState.setPower(!ledState.powered())">
+            {{ ledState.powered() ? "Ausschalten" : "Einschalten" }}
+          </ion-button>
 
           <div style="margin-top: 10px">
             <app-color-picker></app-color-picker>
 
             <div style="margin-top: 10px">
-              <app-led-slider
-                label="Helligkeit"
-                [min]="0"
-                [max]="100"
-                [step]="5"
-                [value]="100"
-                unit="%"
-                commandType="set_brightness"
-                payloadKey="brightness"
-              ></app-led-slider>
+              <app-led-slider label="Helligkeit" [min]="0" [max]="100" [step]="5" [value]="ledState.brightness()"
+                unit="%" (valueChange)="ledState.setBrightness($event)"></app-led-slider>
             </div>
 
             <div style="margin-top: 10px">
-              <app-led-slider
-                label="Anzahl LEDs"
-                [min]="0"
-                [max]="300"
-                [step]="5"
-                [value]="300"
-                commandType="set_led_count"
-                payloadKey="count"
-              ></app-led-slider>
+              <app-led-slider label="Anzahl LEDs" [min]="0" [max]="ledState.stripLength()" [step]="5" [buttonStep]="5"
+                [value]="ledState.ledCount()" (valueChange)="ledState.setLedCount($event)"></app-led-slider>
+            </div>
+
+            <div style="margin-top: 10px">
+              <!-- Länge des Streifens, ist die Obergrenze für "Anzahl LEDs" und wird pro ESP gespeichert -->
+              <ion-input label="LEDs am Streifen" labelPlacement="floating" fill="outline" type="number"
+                inputmode="numeric" helperText="Zahl eintippen, 1 bis {{ maxStripLength }}" [min]="1"
+                [max]="maxStripLength" [value]="ledState.stripLength()"
+                (ionChange)="onStripLengthChange($event)"></ion-input>
             </div>
           </div>
         </div>

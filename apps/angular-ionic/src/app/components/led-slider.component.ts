@@ -1,6 +1,5 @@
-import { Component, inject, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BleService } from 'src/app/services/ble.service';
 import { IonButton } from '@ionic/angular';
 
 @Component({
@@ -39,29 +38,34 @@ export class LedSliderComponent {
   @Input({ required: true }) step!: number;
   @Input() unit = '';
 
-  // BLE Command Type und Payload-Feldname, passend zum Protokoll auf dem ESP32
-  @Input({ required: true }) commandType!: string;
-  @Input({ required: true }) payloadKey!: string;
+  // Schrittweite für - und +, falls sie größer sein soll als die des Sliders
+  // (z.B. Slider auf 1 LED genau, die Buttons in 5er Schritten)
+  @Input() buttonStep?: number;
 
   @Input() value = 0;
 
-  private readonly bleService = inject(BleService);
+  // Das Senden an den ESP32 übernimmt der LedStateService, der Slider meldet nur den neuen Wert
+  @Output() valueChange = new EventEmitter<number>();
 
   constructor() {}
 
-  async onChange(): Promise<void> {
-    await this.bleService.sendCommand(this.commandType, {
-      [this.payloadKey]: this.value,
-    });
+  onChange(): void {
+    this.valueChange.emit(this.value);
   }
 
-  async minus() {
-    this.value = Math.max(this.min, this.value - this.step);
-    await this.onChange();
+  minus(): void {
+    this.value = Math.max(
+      this.min,
+      this.value - (this.buttonStep ?? this.step),
+    );
+    this.onChange();
   }
 
-  async plus() {
-    this.value = Math.min(this.max, this.value + this.step);
-    await this.onChange();
+  plus(): void {
+    this.value = Math.min(
+      this.max,
+      this.value + (this.buttonStep ?? this.step),
+    );
+    this.onChange();
   }
 }

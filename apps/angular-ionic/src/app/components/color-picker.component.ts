@@ -1,18 +1,20 @@
 import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { BleService } from 'src/app/services/ble.service';
+import { LedStateService } from 'src/app/services/led-state.service';
 import { IonButton } from '@ionic/angular';
 
 @Component({
   selector: 'app-color-picker',
   standalone: true,
-  imports: [FormsModule, IonButton],
+  imports: [IonButton],
   template: `
     <div class="color-picker">
+      <!-- Wert aus $event.target statt aus ngModel: kein Rennen zwischen "input" und "change".
+           Der angezeigte Wert kommt aus dem LedStateService und fällt bei Regenbogen / aus auf
+           neutral zurück, damit "change" auch für dieselbe Farbe nochmal feuert. -->
       <input
         type="color"
-        [(ngModel)]="selectedColor"
-        (change)="onColorChange()"
+        [value]="ledState.pickerColor()"
+        (change)="onColorChange($any($event.target).value)"
       />
 
       <div class="presets" style="margin-top: 10px;">
@@ -22,35 +24,23 @@ import { IonButton } from '@ionic/angular';
   `,
 })
 export class ColorPickerComponent {
-  public selectedColor = '#ffffff';
-
-  private readonly bleService = inject(BleService);
+  protected readonly ledState = inject(LedStateService);
 
   constructor() {}
 
   setPreset(hex: string): void {
-    this.selectedColor = hex;
-    void this.onColorChange();
+    void this.onColorChange(hex);
   }
 
-  async onColorChange(): Promise<void> {
-    const { r, g, b } = this.hexToRgb(this.selectedColor);
-    await this.bleService.sendCommand('set_color', { r, g, b });
+  async onColorChange(hex: string): Promise<void> {
+    await this.ledState.setColor(hex);
   }
 
   // Läuft auf dem ESP32 weiter, bis eine neue Farbe (oder später eine andere
   // Animation) gesendet wird, auch wenn die BLE-Verbindung währenddessen abbricht.
   async startRainbow(): Promise<void> {
-    await this.bleService.sendCommand('start_rainbow');
+    await this.ledState.startRainbow();
   }
 
-  // '#rrggbb' in einzelne 0..255 Kanäle zerlegen, passend zum { r, g, b } Payload des ESP32
-  private hexToRgb(hex: string): { r: number; g: number; b: number } {
-    const value = hex.replace('#', '');
-    return {
-      r: parseInt(value.substring(0, 2), 16),
-      g: parseInt(value.substring(2, 4), 16),
-      b: parseInt(value.substring(4, 6), 16),
-    };
-  }
+  // hexToRgb (und damit das Senden an den ESP32) liegt jetzt im LedStateService
 }
